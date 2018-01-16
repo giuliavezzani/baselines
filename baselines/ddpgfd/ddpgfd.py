@@ -59,7 +59,8 @@ class DDPGFD(object):
         gamma=0.99, tau=0.001, normalize_returns=False, enable_popart=False, normalize_observations=True,
         batch_size=128, observation_range=(-5., 5.), action_range=(-1., 1.), return_range=(-np.inf, np.inf),
         adaptive_param_noise=True, adaptive_param_noise_policy_threshold=.1,
-        critic_l2_reg=0., actor_lr=1e-4, critic_lr=1e-3, clip_norm=None, reward_scale=1.):
+        critic_l2_reg=0., actor_lr=1e-4, critic_lr=1e-3, clip_norm=None, reward_scale=1.,
+        eps, eps_d, lambda_3, beta=1):
         # Inputs.
         self.obs0 = tf.placeholder(tf.float32, shape=(None,) + observation_shape, name='obs0')
         self.obs1 = tf.placeholder(tf.float32, shape=(None,) + observation_shape, name='obs1')
@@ -90,6 +91,10 @@ class DDPGFD(object):
         self.batch_size = batch_size
         self.stats_sample = None
         self.critic_l2_reg = critic_l2_reg
+        self.eps = eps
+        self.eps_d = eps_d
+        self.lambda_3 = lambda_3
+        self.beta = beta
 
         # Observation normalization.
         if self.normalize_observations:
@@ -161,7 +166,8 @@ class DDPGFD(object):
 
     def setup_actor_optimizer(self):
         logger.info('setting up actor optimizer')
-        self.actor_loss = -tf.reduce_mean(self.critic_with_actor_tf)
+        # Weighted sum
+        self.actor_loss = -tf.reduce_mean(np.multiply(self.critic_with_actor_tf, self.weights))
         actor_shapes = [var.get_shape().as_list() for var in self.actor.trainable_vars]
         actor_nb_params = sum([reduce(lambda x, y: x * y, shape) for shape in actor_shapes])
         logger.info('  actor shapes: {}'.format(actor_shapes))
@@ -173,7 +179,7 @@ class DDPGFD(object):
     def setup_critic_optimizer(self):
         logger.info('setting up critic optimizer')
         normalized_critic_target_tf = tf.clip_by_value(normalize(self.critic_target, self.ret_rms), self.return_range[0], self.return_range[1])
-        self.critic_loss = tf.reduce_mean(tf.square(self.normalized_critic_tf - normalized_critic_target_tf))
+        self.critic_loss = tf.reduce_mean((np.multiply(tf.square(self.normalized_critic_tf - normalized_critic_target_tf), self.weights))
         if self.critic_l2_reg > 0.:
             critic_reg_vars = [var for var in self.critic.trainable_vars if 'kernel' in var.name and 'output' not in var.name]
             for var in critic_reg_vars:
@@ -273,7 +279,17 @@ class DDPGFD(object):
 
     def train(self):
         # Get a batch.
-        batch = self.memory.sample(batch_size=self.batch_size)
+        #batch = self.memory.sample(batch_size=self.batch_size)
+
+        #Sample with priorization
+        if num_iter == 0:
+           batch = self.memory.sample(batch_size=self.batch_size)
+        elif:
+           batch = self.memory.sample_with_priorization(batch_size=self.batch_size, priority=priority)
+
+        # Compute weights for loss (weighted loss)
+        # What is N???
+        weights = ( 1 / N * 1 / priority ) ** self.beta
 
         if self.normalize_returns and self.enable_popart:
             old_mean, old_std, target_Q = self.sess.run([self.ret_rms.mean, self.ret_rms.std, self.target_Q], feed_dict={
@@ -313,7 +329,13 @@ class DDPGFD(object):
         self.actor_optimizer.update(actor_grads, stepsize=self.actor_lr)
         self.critic_optimizer.update(critic_grads, stepsize=self.critic_lr)
 
+        priority = compute_propriority()
         return critic_loss, actor_loss
+
+    def compute_priority(self):
+
+        TDerror = batch['rewards'] + self.gamma * (critic(normalized_obs1, self.actions) - critic(normalized_obs0, self.actions))
+        return TDerror + self.lambda_3 * tf.gradient(critic(normalized_obs0, self.actions), self.action)) + self.eps + self.eps_d
 
     def initialize(self, sess):
         self.sess = sess
