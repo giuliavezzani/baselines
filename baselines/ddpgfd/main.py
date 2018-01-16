@@ -24,7 +24,7 @@ class Demo():
         self.acts = acts
         self.rewards = rewards
         self.terms = terms
-        
+
 def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo, alpha, **kwargs):
     # Configure things.
     rank = MPI.COMM_WORLD.Get_rank()
@@ -100,11 +100,11 @@ def read_demo_file(demo_file):
     rewards = list()
     terms = list()
     for i in range(len(demo_dict)):
-        obs0.append( demo_dict[i]['s'] )
-        obs1.append( demo_dict[i]['s'] )
+        obs0.append( demo_dict[i]['s0'] )
+        obs1.append( demo_dict[i]['s1'] )
         acts.append( demo_dict[i]['a'] )
         rewards.append( demo_dict[i]['r'] )
-        terms.append( demo_dict[i]['r'] )
+        terms.append( demo_dict[i]['t'] )
 
     return Demo(obs0, obs1, acts, rewards, terms)
 
