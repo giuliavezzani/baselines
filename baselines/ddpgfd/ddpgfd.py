@@ -288,8 +288,7 @@ class DDPGFD(object):
            batch = self.memory.sample_with_priorization(batch_size=self.batch_size, priority=priority)
 
         # Compute weights for loss (weighted loss)
-        # What is N???
-        weights = ( 1 / N * 1 / priority ) ** self.beta
+        weights = ( 1 / self.batch_size * 1 / priority ) ** self.beta
 
         if self.normalize_returns and self.enable_popart:
             old_mean, old_std, target_Q = self.sess.run([self.ret_rms.mean, self.ret_rms.std, self.target_Q], feed_dict={
