@@ -1,5 +1,6 @@
 import tensorflow as tf
 import tensorflow.contrib as tc
+import pickle
 
 
 class Model(object):
@@ -35,16 +36,22 @@ class Actor(Model):
             if self.layer_norm:
                 x = tc.layers.layer_norm(x, center=True, scale=True)
             x = tf.nn.relu(x)
-            
+
             x = tf.layers.dense(x, 64)
             if self.layer_norm:
                 x = tc.layers.layer_norm(x, center=True, scale=True)
             x = tf.nn.relu(x)
-            
+
             x = tf.layers.dense(x, self.nb_actions, kernel_initializer=tf.random_uniform_initializer(minval=-3e-3, maxval=3e-3))
             x = tf.nn.tanh(x)
         return x
 
+    def save_actor(self, path):
+        #if os.path.isfile(path):
+        #    os.remove(path)
+        f = open(path, 'wb')
+        pickle.dump(self,f)
+        f.close()
 
 class Critic(Model):
     def __init__(self, name='critic', layer_norm=True):
