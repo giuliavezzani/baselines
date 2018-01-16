@@ -9,15 +9,23 @@ from baselines.common.misc_util import (
     boolean_flag,
 )
 import baselines.ddpg.training as training
-from baselines.ddpg.models import Actor, Critic
-from baselines.ddpg.memory import Memory
-from baselines.ddpg.noise import *
+from baselines.ddpgfd.models import Actor, Critic
+from baselines.ddpgfd.memory import Memory
+from baselines.ddpgfd.noise import *
 
 import gym
 import tensorflow as tf
 from mpi4py import MPI
 
-def run(env_id, seed, noise_type, layer_norm, evaluation, **kwargs):
+class Demo():
+    def __init__(self, obs0, obs1, acts, rewards, terms):
+        self.obs0 = obs0
+        self.obs1 = obs1
+        self.acts = acts
+        self.rewards = rewards
+        self.terms = terms
+        
+def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo, alpha, **kwargs):
     # Configure things.
     rank = MPI.COMM_WORLD.Get_rank()
     if rank != 0:
@@ -86,13 +94,19 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, **kwargs):
 def read_demo_file(demo_file):
 
     demo_dict = np.load(demo_file)
+    obs0 = list()
+    obs1 = list()
+    acts = list()
+    rewards = list()
+    terms = list()
     for i in range(len(demo_dict)):
-        demonstrations.obs0.append( demo_dict.[i]['s'] )
-        demonstrations.acts.append( demo_dict.[i]['a'] )
-        demonstrations.rewards[i].append( demo_dict.[i]['r'] )
+        obs0.append( demo_dict[i]['s'] )
+        obs1.append( demo_dict[i]['s'] )
+        acts.append( demo_dict[i]['a'] )
+        rewards.append( demo_dict[i]['r'] )
+        terms.append( demo_dict[i]['r'] )
 
-    return demonstrations
-
+    return Demo(obs0, obs1, acts, rewards, terms)
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -119,9 +133,9 @@ def parse_args():
     parser.add_argument('--nb-rollout-steps', type=int, default=100)  # per epoch cycle and MPI worker
     parser.add_argument('--noise-type', type=str, default='adaptive-param_0.2')  # choices are adaptive-param_xx, ou_xx, normal_xx, none
     parser.add_argument('--num-timesteps', type=int, default=None)
-    parser.add_argument('--nb-min-demo', typ=int, default=10) # minimum number of demo guaranteed in the replay buffer
-    parser.add_argument('--demo-file', typ=str, default='demo-test-long.npy') # minimum number of demo guaranteed in the replay buffer
-    parser.add_argument('--alpha', typ=float, default=0.3) # alpha value for priorization
+    parser.add_argument('--nb-min-demo', type=int, default=10) # minimum number of demo guaranteed in the replay buffer
+    parser.add_argument('--demo-file', type=str, default='demo-test-long.npy') # minimum number of demo guaranteed in the replay buffer
+    parser.add_argument('--alpha', type=float, default=0.3) # alpha value for priorization
     boolean_flag(parser, 'evaluation', default=False)
     args = parser.parse_args()
     # we don't directly specify timesteps for this script, so make sure that if we do specify them

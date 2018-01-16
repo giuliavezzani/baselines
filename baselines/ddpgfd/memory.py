@@ -2,7 +2,7 @@ import numpy as np
 
 
 class DemoRingBuffer(object):
-    def __init__(self, maxlen, data, dtype='float32'):
+    def __init__(self, maxlen, data, nb_min_demo, dtype='float32'):
         self.maxlen = maxlen
         self.start = 0
         self.nb_min_demo = nb_min_demo
@@ -29,10 +29,17 @@ class DemoRingBuffer(object):
             # No space, "remove" the (nb-min-demo + 1)-th element
             # since we need to preserve at least nb-min-demo elements
             # from the original demonstrations
-            self.data[i for i in arange(self.nb_min_demo, self.lenght - 2)] = self.data[(i + 1  for i in arange(self.nb_min_demo, self.lenght - 2))]
+            for i in arange(0, self.nb_min_demo):
+                self.data[i + 1] = self.data[i]
+            self.start = (self.start + 1) % self.maxlen
         else:
             # This should never happen.
             raise RuntimeError()
+        print(self.length)
+        print(self.maxlen)
+        print(self.start)
+        print((self.start + self.length - 1) % self.maxlen)
+        print(self.data)
         self.data[(self.start + self.length - 1) % self.maxlen] = v
 
 
@@ -50,15 +57,13 @@ class Memory(object):
         self.nb_min_demo = nb_min_demo
         assert( alpha > 0 )
         self.alpha = alpha
-
-        assert(observation_shape == demonstrations.obs0)
-        self.observations0 = DemoRingBuffer(limit,demonstrations.obs0)
-        assert(action_shape == demonstrations.acts)
-        self.actions = DemoRingBuffer(limit, demonstrations.acts)
-        self.rewards = DemoRingBuffer(limit, demonstrations.rewards)
-        self.terminals1 = DemoRingBuffer(limit, demonstrations.terminals)
+        
+        self.observations0 = DemoRingBuffer(limit,demonstrations.obs0, nb_min_demo)
+        self.actions = DemoRingBuffer(limit, demonstrations.acts, nb_min_demo)
+        self.rewards = DemoRingBuffer(limit, demonstrations.rewards, nb_min_demo)
+        self.terminals1 = DemoRingBuffer(limit, demonstrations.terms, nb_min_demo)
         #assert(observation_shape == demonstrations.obs1)
-        #self.observations1 = DemoRingBuffer(limit, demonstrations.obs1)  ## maybe demonstration here are not necessary
+        self.observations1 = DemoRingBuffer(limit, demonstrations.obs1, nb_min_demo)  ## maybe demonstration here are not necessary
 
     def sample(self, batch_size):
         # Draw such that we always have a proceeding element.
@@ -83,7 +88,7 @@ class Memory(object):
         # Draw such that we always have a proceeding element.
         priority_alpha = priority ** self.alpha
         priority_alpha = priority_alpha / np.sum(priority_alpha)
-        batch_idxs = np.random.choice(self.nb_entries - 2, size=batch_size, p=priority_alpha))
+        batch_idxs = np.random.choice(self.nb_entries - 2, size=batch_size, p=priority_alpha)
 
         obs0_batch = self.observations0.get_batch(batch_idxs)
         obs1_batch = self.observations1.get_batch(batch_idxs)
