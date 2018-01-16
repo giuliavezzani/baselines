@@ -5,9 +5,10 @@ class DemoRingBuffer(object):
     def __init__(self, maxlen, data, dtype='float32'):
         self.maxlen = maxlen
         self.start = 0
-        self.start_after_nb_min_demo = nb_min_demo
+        self.nb_min_demo = nb_min_demo
         self.length = 0
         self.data = data
+        self.discarded_elem = 0
 
     def __len__(self):
         return self.length
@@ -15,14 +16,14 @@ class DemoRingBuffer(object):
     def __getitem__(self, idx):
         if idx < 0 or idx >= self.length:
             raise KeyError()
-        if idx < nb_min_demo:
+        if idx < self.nb_min_demo:
             return self.data[(self.start + idx) % self.maxlen]
-        elif idx >= nb_min_demo:
-            return self.data[(self.start_after_nb_demo + idx) % self.maxlen]
+    elif idx >= self.nb_min_demo:
+            return self.data[(self.start + idx + self.discarded) % self.maxlen]
 
     def get_batch(self, idxs):
-        self.data_tmp = self.data[((self.start + idxs) % self.maxlen)]
-        return self.data_tmp[(self.start_after_nb_demo + idx for idx in idxs if idx >= nb_min_demo) % self.maxlen]
+        #self.data_tmp = self.data[((self.start + idxs) % self.maxlen)]
+        return self.data[int(self.start + idx + self.discarded * (np.sign(idx - self.nb_demo - 1) + 1 ) / 2  for idx in idxs) % self.maxlen]
 
     def append(self, v):
         if self.length < self.maxlen:
@@ -32,7 +33,7 @@ class DemoRingBuffer(object):
             # No space, "remove" the (nb-min-demo + 1)-th element
             # since we need to preserve at least nb-min-demo elements
             # from the original demonstrations
-            self.start_after_nb_min_demo = (self.start_after_nb_min_demo + 1) % self.maxlen
+            self.discarded_elem += 1
         else:
             # This should never happen.
             raise RuntimeError()
@@ -86,7 +87,7 @@ class Memory(object):
         # Draw such that we always have a proceeding element.
         priority_alpha = priority ** alpha
         priority_alpha = priority_alpha / np.sum(priority_alpha)
-        batch_idxs = np.random.choice(self.nb_entries - 2, size=batch_size, p=(priority_alpha)))
+        batch_idxs = np.random.choice(self.nb_entries - 2, size=batch_size, p=priority_alpha))
 
         obs0_batch = self.observations0.get_batch(batch_idxs)
         obs1_batch = self.observations1.get_batch(batch_idxs)
