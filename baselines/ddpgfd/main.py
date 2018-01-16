@@ -58,7 +58,7 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, **kwargs):
     # Configure components.
 
     # Read the doemonstration
-    demonstrations = read_demo_file(demo_file) ## TODO
+    demonstrations = read_demo_file(demo_file)
     memory = Memory(limit=int(1e6), action_shape=env.action_space.shape, observation_shape=env.observation_space.shape, nb_min_demo=nb_min_demo, demonstrations=demonstrations, alpha=alpha)
     critic = Critic(layer_norm=layer_norm)
     actor = Actor(nb_actions, layer_norm=layer_norm)
@@ -84,7 +84,13 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, **kwargs):
         logger.info('total runtime: {}s'.format(time.time() - start_time))
 
 def read_demo_file(demo_file):
-    ## TODO
+
+    demo_dict = np.load(demo_file)
+    for i in range(len(demo_dict)):
+        demonstrations.obs0.append( demo_dict.[i]['s'] )
+        demonstrations.acts.append( demo_dict.[i]['a'] )
+        demonstrations.rewards[i].append( demo_dict.[i]['r'] )
+
     return demonstrations
 
 
@@ -114,7 +120,7 @@ def parse_args():
     parser.add_argument('--noise-type', type=str, default='adaptive-param_0.2')  # choices are adaptive-param_xx, ou_xx, normal_xx, none
     parser.add_argument('--num-timesteps', type=int, default=None)
     parser.add_argument('--nb-min-demo', typ=int, default=10) # minimum number of demo guaranteed in the replay buffer
-    parser.add_argument('--demo-file', typ=str, default='demo.txt') # minimum number of demo guaranteed in the replay buffer
+    parser.add_argument('--demo-file', typ=str, default='demo-test-long.npy') # minimum number of demo guaranteed in the replay buffer
     parser.add_argument('--alpha', typ=float, default=0.3) # alpha value for priorization
     boolean_flag(parser, 'evaluation', default=False)
     args = parser.parse_args()

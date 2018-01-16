@@ -32,7 +32,7 @@ class DemoRingBuffer(object):
             self.data[i for i in arange(self.nb_min_demo, self.lenght - 2)] = self.data[(i + 1  for i in arange(self.nb_min_demo, self.lenght - 2))]
         else:
             # This should never happen.
-            raise RuntimeError()        
+            raise RuntimeError()
         self.data[(self.start + self.length - 1) % self.maxlen] = v
 
 
@@ -57,8 +57,8 @@ class Memory(object):
         self.actions = DemoRingBuffer(limit, demonstrations.acts)
         self.rewards = DemoRingBuffer(limit, demonstrations.rewards)
         self.terminals1 = DemoRingBuffer(limit, demonstrations.terminals)
-        assert(observation_shape == demonstrations.obs1)
-        self.observations1 = DemoRingBuffer(limit, demonstrations.obs1)  ## maybe demonstration here are not necessary
+        #assert(observation_shape == demonstrations.obs1)
+        #self.observations1 = DemoRingBuffer(limit, demonstrations.obs1)  ## maybe demonstration here are not necessary
 
     def sample(self, batch_size):
         # Draw such that we always have a proceeding element.
@@ -81,7 +81,7 @@ class Memory(object):
 
     def sample_with_priorization(self, batch_size, priority):
         # Draw such that we always have a proceeding element.
-        priority_alpha = priority ** alpha
+        priority_alpha = priority ** self.alpha
         priority_alpha = priority_alpha / np.sum(priority_alpha)
         batch_idxs = np.random.choice(self.nb_entries - 2, size=batch_size, p=priority_alpha))
 
