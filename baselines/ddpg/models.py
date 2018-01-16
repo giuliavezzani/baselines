@@ -53,6 +53,7 @@ class Actor(Model):
         pickle.dump(self,f)
         f.close()
 
+
 class Critic(Model):
     def __init__(self, name='critic', layer_norm=True):
         super(Critic, self).__init__(name=name)
