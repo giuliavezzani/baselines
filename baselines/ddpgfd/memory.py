@@ -7,8 +7,8 @@ class DemoRingBuffer(object):
         self.start = 0
         self.nb_min_demo = nb_min_demo
         self.length = 0
-        self.data = data[0].tolist()
-
+        self.data =  [data[i] for i in range(len(data))]
+        
     def __len__(self):
         return self.length
 

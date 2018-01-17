@@ -108,13 +108,15 @@ def read_demo_file(demo_file):
         rewards.append( demo_dict[i]['r'] )
         terms.append( demo_dict[i]['t'] )
 
+    #import IPython
+    #IPython.embed()
     print('obs0', obs0[0].shape)
     print('obs1', obs1[0].shape)
     print('acts', acts[0].shape)
     print('reward', rewards[0].shape)
     print('terms', terms[0].shape)
 
-    return Demo(obs0, obs1, acts, rewards, terms)
+    return Demo(np.vstack(obs0), np.vstack(obs1), np.vstack(acts), np.concatenate(rewards), np.concatenate(terms))
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
