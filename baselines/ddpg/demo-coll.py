@@ -9,16 +9,18 @@ def main():
     f = open('model.pkl', 'rb')
     act = pickle.load(f)
 
-    returns = []
-    observations0 = []
-    actions = []
-    observations1 = []
-    terminals = []
     experts = []
 
     #while True:
     for i_rollout in range(10):
         print('rollout_no: ', i_rollout)
+
+        returns = []
+        observations0 = []
+        actions = []
+        observations1 = []
+        terminals = []
+
         obs = env.reset()
         episode_rew = 0
         done = False
@@ -45,8 +47,7 @@ def main():
         print(np.array(actions).shape)
         print(np.array(returns).shape)
         print(np.array(terminals).shape)
-    experts.append(expert_data)
-
+        experts.append(expert_data)
     np.save('demo-collected-2.npy', experts)
 
 if __name__ == '__main__':
