@@ -69,6 +69,8 @@ class DDPGFD(object):
         self.critic_target = tf.placeholder(tf.float32, shape=(None, 1), name='critic_target')
         self.param_noise_stddev = tf.placeholder(tf.float32, shape=(), name='param_noise_stddev')
 
+        self.priority_for_weights = tf.placeholder(tf.float32, shape=(None,1) , name='priority_for_weights')
+
         # Parameters.
         self.gamma = gamma
         self.tau = tau
@@ -137,6 +139,8 @@ class DDPGFD(object):
         # Create core TF for computing priority
         self.TDerror = self.rewards + self.gamma * (self.normalized_critic_tf_1 - self.normalized_critic_tf)
         self.prior = tf.pow(self.TDerror, 2) + self.lambda_3 * tf.pow(tf.norm((tf.gradients(self.normalized_critic_tf, self.actions))), 2) + self.eps + self.eps_d
+
+        self.weights = 1 / self.batch_size * np.divide(1, self.priority_for_weights)
         # Set up parts.
         if self.param_noise is not None:
             self.setup_param_noise(normalized_obs0)
@@ -173,8 +177,8 @@ class DDPGFD(object):
     def setup_actor_optimizer(self):
         logger.info('setting up actor optimizer')
         # Weighted sum
-        #self.actor_loss = -tf.reduce_mean(np.multiply(self.critic_with_actor_tf, self.weights))
-        self.actor_loss = -tf.reduce_mean(self.critic_with_actor_tf)
+        self.actor_loss = -tf.reduce_mean(np.multiply(self.critic_with_actor_tf, self.weights))
+        #self.actor_loss = -tf.reduce_mean(self.critic_with_actor_tf)
         actor_shapes = [var.get_shape().as_list() for var in self.actor.trainable_vars]
         actor_nb_params = sum([reduce(lambda x, y: x * y, shape) for shape in actor_shapes])
         logger.info('  actor shapes: {}'.format(actor_shapes))
@@ -186,8 +190,8 @@ class DDPGFD(object):
     def setup_critic_optimizer(self):
         logger.info('setting up critic optimizer')
         normalized_critic_target_tf = tf.clip_by_value(normalize(self.critic_target, self.ret_rms), self.return_range[0], self.return_range[1])
-        #self.critic_loss = tf.reduce_mean((np.multiply(tf.square(self.normalized_critic_tf - normalized_critic_target_tf), self.weights)))
-        self.critic_loss = tf.reduce_mean(tf.square(self.normalized_critic_tf - normalized_critic_target_tf))
+        self.critic_loss = tf.reduce_mean((np.multiply(tf.square(self.normalized_critic_tf - normalized_critic_target_tf), self.weights)))
+        #self.critic_loss = tf.reduce_mean(tf.square(self.normalized_critic_tf - normalized_critic_target_tf))
         if self.critic_l2_reg > 0.:
             critic_reg_vars = [var for var in self.critic.trainable_vars if 'kernel' in var.name and 'output' not in var.name]
             for var in critic_reg_vars:
@@ -288,7 +292,7 @@ class DDPGFD(object):
     def train(self, num_iter):
         # Get a batch.
         #batch = self.memory.sample(batch_size=self.batch_size)
-
+        print('num_iter', num_iter)
         #Sample with priorization
         if num_iter == 0:
             batch = self.memory.sample(batch_size=self.batch_size)
@@ -328,12 +332,22 @@ class DDPGFD(object):
             })
 
         # Get all gradients and perform a synced update.
-        ops = [self.actor_grads, self.actor_loss, self.critic_grads, self.critic_loss]
-        actor_grads, actor_loss, critic_grads, critic_loss = self.sess.run(ops, feed_dict={
-            self.obs0: batch['obs0'],
-            self.actions: batch['actions'],
-            self.critic_target: target_Q,
-        })
+        if num_iter == 0:
+            ops = [self.actor_grads, self.actor_loss, self.critic_grads, self.critic_loss]
+            actor_grads, actor_loss, critic_grads, critic_loss = self.sess.run(ops, feed_dict={
+                self.obs0: batch['obs0'],
+                self.actions: batch['actions'],
+                self.critic_target: target_Q,
+                self.priority_for_weights: np.ones(shape= batch['rewards'].shape)
+            })
+        else:
+            ops = [self.actor_grads, self.actor_loss, self.critic_grads, self.critic_loss]
+            actor_grads, actor_loss, critic_grads, critic_loss = self.sess.run(ops, feed_dict={
+                self.obs0: batch['obs0'],
+                self.actions: batch['actions'],
+                self.critic_target: target_Q,
+                self.priority_for_weights: self.priority[self.memory.batch_idxs]
+            })
 
         #TDerror = batch['rewards'] + self.gamma * (self.normalized_critic_tf_1 - self.normalized_critic_tf)
         #prior = TDerror + self.lambda_3 * (tf.gradients(self.normalized_critic_tf)) ** 2 + self.eps + self.eps_d

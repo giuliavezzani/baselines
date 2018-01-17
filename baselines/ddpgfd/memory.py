@@ -85,13 +85,13 @@ class Memory(object):
         #print(priority_alpha[:,0])
         priority_alpha = priority_alpha / np.sum(priority_alpha)
         #print(priority_alpha[:,0])
-        batch_idxs = np.random.choice(self.nb_entries, size=batch_size, p=priority_alpha[:,0])
+        self.batch_idxs = np.random.choice(self.nb_entries, size=batch_size, p=priority_alpha[:,0])
 
-        obs0_batch = self.observations0.get_batch(batch_idxs)
-        obs1_batch = self.observations1.get_batch(batch_idxs)
-        action_batch = self.actions.get_batch(batch_idxs)
-        reward_batch = self.rewards.get_batch(batch_idxs)
-        terminal1_batch = self.terminals1.get_batch(batch_idxs)
+        obs0_batch = self.observations0.get_batch(self.batch_idxs)
+        obs1_batch = self.observations1.get_batch(self.batch_idxs)
+        action_batch = self.actions.get_batch(self.batch_idxs)
+        reward_batch = self.rewards.get_batch(self.batch_idxs)
+        terminal1_batch = self.terminals1.get_batch(self.batch_idxs)
 
         result = {
             'obs0': array_min2d(obs0_batch),
