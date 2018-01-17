@@ -126,11 +126,16 @@ class DDPGFD(object):
         # Create networks and core TF parts that are shared across setup parts.
         self.actor_tf = actor(normalized_obs0)
         self.normalized_critic_tf = critic(normalized_obs0, self.actions)
+        self.normalized_critic_tf_1 = critic(normalized_obs1, self.actions, reuse=True)
         self.critic_tf = denormalize(tf.clip_by_value(self.normalized_critic_tf, self.return_range[0], self.return_range[1]), self.ret_rms)
         self.normalized_critic_with_actor_tf = critic(normalized_obs0, self.actor_tf, reuse=True)
         self.critic_with_actor_tf = denormalize(tf.clip_by_value(self.normalized_critic_with_actor_tf, self.return_range[0], self.return_range[1]), self.ret_rms)
         Q_obs1 = denormalize(target_critic(normalized_obs1, target_actor(normalized_obs1)), self.ret_rms)
         self.target_Q = self.rewards + (1. - self.terminals1) * gamma * Q_obs1
+
+        # Create core TF for computing priority
+        self.TDerror = self.rewards + self.gamma * (self.normalized_critic_tf_1 - self.normalized_critic_tf)
+        self.prior = self.TDerror + self.lambda_3 * tf.pow((tf.gradients(self.normalized_critic_tf, self.actions)), 2) + self.eps + self.eps_d
 
         # Set up parts.
         if self.param_noise is not None:
@@ -328,16 +333,20 @@ class DDPGFD(object):
             self.actions: batch['actions'],
             self.critic_target: target_Q,
         })
+
+        #TDerror = batch['rewards'] + self.gamma * (self.normalized_critic_tf_1 - self.normalized_critic_tf)
+        #prior = TDerror + self.lambda_3 * (tf.gradients(self.normalized_critic_tf)) ** 2 + self.eps + self.eps_d
+        priority = self.sess.run(self.prior, feed_dict={
+            self.actions: batch['actions'],
+            self.obs0: batch['obs0'],
+            self.obs1: batch['obs1'],
+	    self.rewards : batch['rewards']
+        })
+
+
         self.actor_optimizer.update(actor_grads, stepsize=self.actor_lr)
         self.critic_optimizer.update(critic_grads, stepsize=self.critic_lr)
 
-        TDerror = batch['rewards'] + self.gamma * (critic(normalized_obs1, self.actions) - critic(normalized_obs0, self.actions))
-        prior = TDerror + self.lambda_3 * (tf.gradients(critic(normalized_obs0, self.actions), self.action)) ** 2 + self.eps + self.eps_d
-        priority = self.sess.run(prior, feed_dict={
-            self.actions: batch['actions'],
-            self.obs0: batch['obs0'],
-            self.obs1: batch['obs1']
-        })
         #batch_size = batch['obs1'].shape[0]
         #priority = 1/batch_size ** np.ones(batch_size)
         return critic_loss, actor_loss
