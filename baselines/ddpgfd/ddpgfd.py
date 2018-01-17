@@ -293,6 +293,12 @@ class DDPGFD(object):
         if num_iter == 0:
             batch = self.memory.sample(batch_size=self.batch_size)
         else:
+           priority = self.sess.run(self.prior, feed_dict={
+               self.actions: batch['actions'],
+               self.obs0: batch['obs0'],
+               self.obs1: batch['obs1'],
+   	        self.rewards : batch['rewards']
+           })
            batch = self.memory.sample_with_priorization(batch_size=self.batch_size, priority=priority)
 
         # Compute weights for loss (weighted loss)
@@ -336,13 +342,6 @@ class DDPGFD(object):
 
         #TDerror = batch['rewards'] + self.gamma * (self.normalized_critic_tf_1 - self.normalized_critic_tf)
         #prior = TDerror + self.lambda_3 * (tf.gradients(self.normalized_critic_tf)) ** 2 + self.eps + self.eps_d
-        priority = self.sess.run(self.prior, feed_dict={
-            self.actions: batch['actions'],
-            self.obs0: batch['obs0'],
-            self.obs1: batch['obs1'],
-	        self.rewards : batch['rewards']
-        })
-
 
         self.actor_optimizer.update(actor_grads, stepsize=self.actor_lr)
         self.critic_optimizer.update(critic_grads, stepsize=self.critic_lr)
