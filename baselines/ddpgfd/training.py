@@ -15,7 +15,7 @@ from mpi4py import MPI
 
 def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, param_noise, actor, critic,
     normalize_returns, normalize_observations, critic_l2_reg, actor_lr, critic_lr, action_noise,
-    popart, gamma, clip_norm, nb_train_steps, nb_rollout_steps, nb_eval_steps, batch_size, memory, eps, eps_d, lambda_3,
+    popart, gamma, clip_norm, nb_train_steps, nb_rollout_steps, nb_eval_steps, batch_size, memory, eps, eps_d, lambda_3, target_period_update,
     tau=0.01, eval_env=None, param_noise_adaption_interval=50):
     rank = MPI.COMM_WORLD.Get_rank()
 
@@ -121,7 +121,8 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                     cl, al = agent.train(t_train)
                     epoch_critic_losses.append(cl)
                     epoch_actor_losses.append(al)
-                    agent.update_target_net()
+                    if (np.mod(t_train,target_period_update) == 0 ):
+                        agent.update_target_net()
 
                 # Evaluate.
                 eval_episode_rewards = []

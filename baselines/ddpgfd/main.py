@@ -25,7 +25,7 @@ class Demo():
         self.rewards = rewards
         self.terms = terms
 
-def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo, alpha, eps, eps_d, lambda_3, **kwargs):
+def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo, alpha, eps, eps_d, target_period_update, lambda_3, **kwargs):
     # Configure things.
     rank = MPI.COMM_WORLD.Get_rank()
     if rank != 0:
@@ -85,7 +85,7 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo
         start_time = time.time()
     training.train(env=env, eval_env=eval_env, param_noise=param_noise,
         action_noise=action_noise, actor=actor, critic=critic, memory=memory,
-        eps=eps, eps_d=eps_d, lambda_3=lambda_3, **kwargs)
+        eps=eps, eps_d=eps_d, lambda_3=lambda_3, target_period_update=target_period_update, **kwargs)
     env.close()
     if eval_env is not None:
         eval_env.close()
@@ -147,6 +147,7 @@ def parse_args():
     parser.add_argument('--eps', type=float, default=0.3) # constant for priorization computation
     parser.add_argument('--eps_d', type=float, default=0.3) # constant for priorization computation
     parser.add_argument('--lambda-3', type=float, default=0.3) # weight for priorization computation
+    parser.add_argument('--target-period-update', type=float, default=20) # target networks are updated every target_period_update training steps
     boolean_flag(parser, 'evaluation', default=False)
     args = parser.parse_args()
     # we don't directly specify timesteps for this script, so make sure that if we do specify them

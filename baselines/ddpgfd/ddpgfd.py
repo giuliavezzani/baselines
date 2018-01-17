@@ -55,7 +55,7 @@ def get_perturbed_actor_updates(actor, perturbed_actor, param_noise_stddev):
 
 
 class DDPGFD(object):
-    def __init__(self, actor, critic, memory, observation_shape, action_shape, eps, eps_d, lambda_3, param_noise=None, action_noise=None,
+    def __init__(self, actor, critic, memory, observation_shape, action_shape, eps, eps_d, lambda_3,  param_noise=None, action_noise=None,
         gamma=0.99, tau=0.001, normalize_returns=False, enable_popart=False, normalize_observations=True,
         batch_size=128, observation_range=(-5., 5.), action_range=(-1., 1.), return_range=(-np.inf, np.inf),
         adaptive_param_noise=True, adaptive_param_noise_policy_threshold=.1,
