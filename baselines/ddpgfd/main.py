@@ -8,7 +8,7 @@ from baselines.common.misc_util import (
     set_global_seeds,
     boolean_flag,
 )
-import baselines.ddpg.training as training
+import baselines.ddpgfd.training as training
 from baselines.ddpgfd.models import Actor, Critic
 from baselines.ddpgfd.memory import Memory
 from baselines.ddpgfd.noise import *
@@ -25,7 +25,7 @@ class Demo():
         self.rewards = rewards
         self.terms = terms
 
-def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo, alpha, **kwargs):
+def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo, alpha, eps, eps_d, lambda_3, **kwargs):
     # Configure things.
     rank = MPI.COMM_WORLD.Get_rank()
     if rank != 0:
@@ -84,7 +84,8 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo
     if rank == 0:
         start_time = time.time()
     training.train(env=env, eval_env=eval_env, param_noise=param_noise,
-        action_noise=action_noise, actor=actor, critic=critic, memory=memory, **kwargs)
+        action_noise=action_noise, actor=actor, critic=critic, memory=memory,
+        eps=eps, eps_d=eps_d, lambda_3=lambda_3, **kwargs)
     env.close()
     if eval_env is not None:
         eval_env.close()
@@ -99,12 +100,19 @@ def read_demo_file(demo_file):
     acts = list()
     rewards = list()
     terms = list()
+
     for i in range(len(demo_dict)):
         obs0.append( demo_dict[i]['s0'] )
         obs1.append( demo_dict[i]['s1'] )
         acts.append( demo_dict[i]['a'] )
         rewards.append( demo_dict[i]['r'] )
         terms.append( demo_dict[i]['t'] )
+
+    print('obs0', obs0[0].shape)
+    print('obs1', obs1[0].shape)
+    print('acts', acts[0].shape)
+    print('reward', rewards[0].shape)
+    print('terms', terms[0].shape)
 
     return Demo(obs0, obs1, acts, rewards, terms)
 
@@ -134,8 +142,11 @@ def parse_args():
     parser.add_argument('--noise-type', type=str, default='adaptive-param_0.2')  # choices are adaptive-param_xx, ou_xx, normal_xx, none
     parser.add_argument('--num-timesteps', type=int, default=None)
     parser.add_argument('--nb-min-demo', type=int, default=10) # minimum number of demo guaranteed in the replay buffer
-    parser.add_argument('--demo-file', type=str, default='demo-test-long.npy') # minimum number of demo guaranteed in the replay buffer
+    parser.add_argument('--demo-file', type=str, default='demo-collected.npy') # minimum number of demo guaranteed in the replay buffer
     parser.add_argument('--alpha', type=float, default=0.3) # alpha value for priorization
+    parser.add_argument('--eps', type=float, default=0.3) # constant for priorization computation
+    parser.add_argument('--eps_d', type=float, default=0.3) # constant for priorization computation
+    parser.add_argument('--lambda-3', type=float, default=0.3) # weight for priorization computation
     boolean_flag(parser, 'evaluation', default=False)
     args = parser.parse_args()
     # we don't directly specify timesteps for this script, so make sure that if we do specify them

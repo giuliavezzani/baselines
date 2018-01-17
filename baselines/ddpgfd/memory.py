@@ -7,7 +7,7 @@ class DemoRingBuffer(object):
         self.start = 0
         self.nb_min_demo = nb_min_demo
         self.length = 0
-        self.data = data
+        self.data = data[0].tolist()
 
     def __len__(self):
         return self.length
@@ -15,11 +15,11 @@ class DemoRingBuffer(object):
     def __getitem__(self, idx):
         if idx < 0 or idx >= self.length:
             raise KeyError()
-        return  self.data[(self.start + idxs) % self.maxlen]
+        return  np.asarray(self.data[(self.start + idxs) % self.maxlen])
 
     def get_batch(self, idxs):
-
-        return self.data[(self.start + idxs) % self.maxlen]
+        self.data_array=np.asarray(self.data)
+        return self.data_array[(self.start + idxs) % self.maxlen]
 
     def append(self, v):
         if self.length < self.maxlen:
@@ -35,13 +35,7 @@ class DemoRingBuffer(object):
         else:
             # This should never happen.
             raise RuntimeError()
-        print(self.length)
-        print(self.maxlen)
-        print(self.start)
-        print((self.start + self.length - 1) % self.maxlen)
-        print(self.data)
-        self.data[(self.start + self.length - 1) % self.maxlen] = v
-
+        self.data.append(v)
 
 def array_min2d(x):
     x = np.array(x)
@@ -57,7 +51,7 @@ class Memory(object):
         self.nb_min_demo = nb_min_demo
         assert( alpha > 0 )
         self.alpha = alpha
-        
+
         self.observations0 = DemoRingBuffer(limit,demonstrations.obs0, nb_min_demo)
         self.actions = DemoRingBuffer(limit, demonstrations.acts, nb_min_demo)
         self.rewards = DemoRingBuffer(limit, demonstrations.rewards, nb_min_demo)

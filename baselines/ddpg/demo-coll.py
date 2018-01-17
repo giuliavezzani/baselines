@@ -17,16 +17,16 @@ def main():
     experts = []
 
     #while True:
-    for i_rollout in range(100):
-        print('rollout_no: ', i)
+    for i_rollout in range(10):
+        print('rollout_no: ', i_rollout)
         obs = env.reset()
-        observations0.append(obs)
-        print(obs)
         episode_rew = 0
         done = False
+
         while not done:
             env.render()
             #action = act(obs[None, :])
+            observations0.append(obs)
             action = env.action_space.sample()
             obs, rew, done, _ = env.step(action)
             actions.append(action)
@@ -40,9 +40,14 @@ def main():
                        'a': np.array(actions),
                        'r': np.array(returns),
                        't': np.array(terminals)}
-       experts.append(expert_data)
+        print(np.array(observations0).shape)
+        print(np.array(observations1).shape)
+        print(np.array(actions).shape)
+        print(np.array(returns).shape)
+        print(np.array(terminals).shape)
+    experts.append(expert_data)
 
-   np.save('demo-collected.npy', experts)
+    np.save('demo-collected.npy', experts)
 
 if __name__ == '__main__':
     main()
