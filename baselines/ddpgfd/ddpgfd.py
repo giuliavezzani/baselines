@@ -59,7 +59,7 @@ class DDPGFD(object):
         gamma=0.99, tau=0.001, normalize_returns=False, enable_popart=False, normalize_observations=True,
         batch_size=128, observation_range=(-5., 5.), action_range=(-1., 1.), return_range=(-np.inf, np.inf),
         adaptive_param_noise=True, adaptive_param_noise_policy_threshold=.1,
-        critic_l2_reg=0., actor_lr=1e-4, critic_lr=1e-3, clip_norm=None, reward_scale=1., beta=1):
+        critic_l2_reg=0., actor_l2_reg=0., actor_lr=1e-4, critic_lr=1e-3, clip_norm=None, reward_scale=1., beta=1):
         # Inputs.
         self.obs0 = tf.placeholder(tf.float32, shape=(None,) + observation_shape, name='obs0')
         self.obs1 = tf.placeholder(tf.float32, shape=(None,) + observation_shape, name='obs1')
@@ -92,6 +92,7 @@ class DDPGFD(object):
         self.batch_size = batch_size
         self.stats_sample = None
         self.critic_l2_reg = critic_l2_reg
+        self.actor_l2_reg = actor_l2_reg
         self.eps = eps
         self.eps_d = eps_d
         self.lambda_3 = lambda_3
@@ -179,6 +180,17 @@ class DDPGFD(object):
         # Weighted sum
         self.actor_loss = -tf.reduce_mean(np.multiply(self.critic_with_actor_tf, self.weights))
         #self.actor_loss = -tf.reduce_mean(self.critic_with_actor_tf)
+        # Adding regularization also for actor
+        if self.actor_l2_reg > 0.:
+            actor_reg_vars = [var for var in self.actor.trainable_vars if 'kernel' in var.name and 'output' not in var.name]
+            for var in actor_reg_vars:
+                logger.info('  regularizing: {}'.format(var.name))
+            logger.info('  applying l2 regularization with {}'.format(self.critic_l2_reg))
+            actor_reg = tc.layers.apply_regularization(
+                tc.layers.l2_regularizer(self.actor_l2_reg),
+                weights_list=actor_reg_vars
+            )
+            self.actor_loss += actor_reg
         actor_shapes = [var.get_shape().as_list() for var in self.actor.trainable_vars]
         actor_nb_params = sum([reduce(lambda x, y: x * y, shape) for shape in actor_shapes])
         logger.info('  actor shapes: {}'.format(actor_shapes))
