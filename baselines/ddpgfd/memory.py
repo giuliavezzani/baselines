@@ -15,7 +15,7 @@ class DemoRingBuffer(object):
     def __getitem__(self, idx):
         if idx < 0 or idx >= self.length:
             raise KeyError()
-        return  np.asarray(self.data[(self.start + idxs) % self.maxlen])
+        return  np.asarray(self.data[(self.start + idx) % self.maxlen])
 
     def get_batch(self, idxs):
         self.data_array=np.asarray(self.data)
@@ -80,9 +80,12 @@ class Memory(object):
 
     def sample_with_priorization(self, batch_size, priority):
         # Draw such that we always have a proceeding element.
+
         priority_alpha = priority ** self.alpha
+        #print(priority_alpha[:,0])
         priority_alpha = priority_alpha / np.sum(priority_alpha)
-        batch_idxs = np.random.choice(self.nb_entries - 2, size=batch_size, p=priority_alpha)
+        #print(priority_alpha[:,0])
+        batch_idxs = np.random.choice(self.nb_entries, size=batch_size, p=priority_alpha[:,0])
 
         obs0_batch = self.observations0.get_batch(batch_idxs)
         obs1_batch = self.observations1.get_batch(batch_idxs)

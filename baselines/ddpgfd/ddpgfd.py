@@ -95,6 +95,7 @@ class DDPGFD(object):
         self.lambda_3 = lambda_3
         self.beta = beta
         self.critic = critic
+        print('observation_shape', observation_shape)
         #self.weights = np.ones(shape=(batch_size, 1))
 
         # Observation normalization.
@@ -135,8 +136,7 @@ class DDPGFD(object):
 
         # Create core TF for computing priority
         self.TDerror = self.rewards + self.gamma * (self.normalized_critic_tf_1 - self.normalized_critic_tf)
-        self.prior = self.TDerror + self.lambda_3 * tf.pow((tf.gradients(self.normalized_critic_tf, self.actions)), 2) + self.eps + self.eps_d
-
+        self.prior = tf.pow(self.TDerror, 2) + self.lambda_3 * tf.pow(tf.norm((tf.gradients(self.normalized_critic_tf, self.actions))), 2) + self.eps + self.eps_d
         # Set up parts.
         if self.param_noise is not None:
             self.setup_param_noise(normalized_obs0)
@@ -292,14 +292,9 @@ class DDPGFD(object):
         #Sample with priorization
         if num_iter == 0:
             batch = self.memory.sample(batch_size=self.batch_size)
+            #priority = np.ones(shape=(self.memory.observations0.length, ))
         else:
-           priority = self.sess.run(self.prior, feed_dict={
-               self.actions: batch['actions'],
-               self.obs0: batch['obs0'],
-               self.obs1: batch['obs1'],
-   	        self.rewards : batch['rewards']
-           })
-           batch = self.memory.sample_with_priorization(batch_size=self.batch_size, priority=priority)
+           batch = self.memory.sample_with_priorization(batch_size=self.batch_size, priority=self.priority)
 
         # Compute weights for loss (weighted loss)
         #self.weights = ( 1 / self.batch_size * 1 / priority ) ** self.beta
@@ -348,6 +343,12 @@ class DDPGFD(object):
 
         #batch_size = batch['obs1'].shape[0]
         #priority = 1/batch_size ** np.ones(batch_size)
+        self.priority = self.sess.run(self.prior, feed_dict={
+            self.actions: self.memory.actions.get_batch(np.arange(self.memory.actions.length)),
+            self.obs0: self.memory.observations0.get_batch(np.arange(self.memory.actions.length)),
+            self.obs1: self.memory.observations1.get_batch(np.arange(self.memory.actions.length)),
+            self.rewards: self.memory.rewards.get_batch(np.arange(self.memory.rewards.length)).reshape(self.memory.rewards.length,1)
+        })
         return critic_loss, actor_loss
 
     def initialize(self, sess):

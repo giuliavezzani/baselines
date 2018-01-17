@@ -33,7 +33,7 @@ def main():
             observations1.append(obs)
             episode_rew += rew
             terminals.append(done)
-        returns.append(episode_rew)
+            returns.append(episode_rew)
 
         expert_data = {'s0': np.array(observations0),
                        's1': np.array(observations1),
@@ -47,7 +47,7 @@ def main():
         print(np.array(terminals).shape)
     experts.append(expert_data)
 
-    np.save('demo-collected.npy', experts)
+    np.save('demo-collected-2.npy', experts)
 
 if __name__ == '__main__':
     main()
