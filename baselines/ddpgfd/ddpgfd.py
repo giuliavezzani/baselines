@@ -94,6 +94,7 @@ class DDPGFD(object):
         self.eps_d = eps_d
         self.lambda_3 = lambda_3
         self.beta = beta
+        self.critic = critic
         #self.weights = np.ones(shape=(batch_size, 1))
 
         # Observation normalization.
