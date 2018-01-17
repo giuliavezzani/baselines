@@ -330,8 +330,13 @@ class DDPGFD(object):
         self.actor_optimizer.update(actor_grads, stepsize=self.actor_lr)
         self.critic_optimizer.update(critic_grads, stepsize=self.critic_lr)
 
-        #TDerror = batch['rewards'] + self.gamma * (critic(normalized_obs1, self.actions) - critic(normalized_obs0, self.actions))
-        #priority = TDerror + self.lambda_3 * tf.gradient(critic(normalized_obs0, self.actions), self.action) + self.eps + self.eps_d
+        TDerror = batch['rewards'] + self.gamma * (critic(normalized_obs1, self.actions) - critic(normalized_obs0, self.actions))
+        prior = TDerror + self.lambda_3 * tf.gradients(critic(normalized_obs0, self.actions), self.action)) ** 2 + self.eps + self.eps_d
+        priority = self.sess.run(prior, feed_dict={
+            self.actions: batch['actions'],
+            self.obs0: batch['obs0'],
+            self.obs1: batch['obs1']
+        })
         #batch_size = batch['obs1'].shape[0]
         #priority = 1/batch_size ** np.ones(batch_size)
         return critic_loss, actor_loss
