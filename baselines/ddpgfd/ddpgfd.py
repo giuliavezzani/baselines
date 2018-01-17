@@ -290,10 +290,10 @@ class DDPGFD(object):
         #batch = self.memory.sample(batch_size=self.batch_size)
 
         #Sample with priorization
-        #if num_iter == 0:
-        batch = self.memory.sample(batch_size=self.batch_size)
-        #else:
-        #   batch = self.memory.sample_with_priorization(batch_size=self.batch_size, priority=priority)
+        if num_iter == 0:
+            batch = self.memory.sample(batch_size=self.batch_size)
+        else:
+           batch = self.memory.sample_with_priorization(batch_size=self.batch_size, priority=priority)
 
         # Compute weights for loss (weighted loss)
         #self.weights = ( 1 / self.batch_size * 1 / priority ) ** self.beta
@@ -340,7 +340,7 @@ class DDPGFD(object):
             self.actions: batch['actions'],
             self.obs0: batch['obs0'],
             self.obs1: batch['obs1'],
-	    self.rewards : batch['rewards']
+	        self.rewards : batch['rewards']
         })
 
 
