@@ -8,6 +8,7 @@ class DemoRingBuffer(object):
         self.nb_min_demo = nb_min_demo
         self.length = 0
         self.data = data[0].tolist()
+        print('len data init', len(self.data))
 
     def __len__(self):
         return self.length
@@ -85,6 +86,9 @@ class Memory(object):
         #print(priority_alpha[:,0])
         priority_alpha = priority_alpha / np.sum(priority_alpha)
         #print(priority_alpha[:,0])
+        #self.batch_idxs = np.random.choice(self.nb_entries, size=batch_size, p=priority_alpha[:,0])
+        print(self.nb_entries)
+        print(len(priority_alpha[:,0]))
         self.batch_idxs = np.random.choice(self.nb_entries, size=batch_size, p=priority_alpha[:,0])
 
         obs0_batch = self.observations0.get_batch(self.batch_idxs)
@@ -114,4 +118,5 @@ class Memory(object):
 
     @property
     def nb_entries(self):
-        return len(self.observations0)
+        #return len(self.observations0)
+        return len(self.observations0.data)

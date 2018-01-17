@@ -25,7 +25,7 @@ class Demo():
         self.rewards = rewards
         self.terms = terms
 
-def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo, alpha, eps, eps_d, target_period_update, lambda_3, **kwargs):
+def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo, alpha, eps, eps_d, target_period_update, lambda_3, nb_training_bc, **kwargs):
     # Configure things.
     rank = MPI.COMM_WORLD.Get_rank()
     if rank != 0:
@@ -85,7 +85,7 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo
         start_time = time.time()
     training.train(env=env, eval_env=eval_env, param_noise=param_noise,
         action_noise=action_noise, actor=actor, critic=critic, memory=memory,
-        eps=eps, eps_d=eps_d, lambda_3=lambda_3, target_period_update=target_period_update, **kwargs)
+        eps=eps, eps_d=eps_d, lambda_3=lambda_3, target_period_update=target_period_update, nb_training_bc=nb_training_bc, **kwargs)
     env.close()
     if eval_env is not None:
         eval_env.close()
@@ -128,6 +128,7 @@ def parse_args():
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--critic-l2-reg', type=float, default=1e-2)
     parser.add_argument('--batch-size', type=int, default=64)  # per MPI worker
+    parser.add_argument('--batch-size-bc', type=int, default=64)  
     parser.add_argument('--actor-lr', type=float, default=1e-4)
     parser.add_argument('--critic-lr', type=float, default=1e-3)
     boolean_flag(parser, 'popart', default=False)
@@ -147,7 +148,8 @@ def parse_args():
     parser.add_argument('--eps', type=float, default=0.3) # constant for priorization computation
     parser.add_argument('--eps_d', type=float, default=0.3) # constant for priorization computation
     parser.add_argument('--lambda-3', type=float, default=0.3) # weight for priorization computation
-    parser.add_argument('--target-period-update', type=float, default=20) # target networks are updated every target_period_update training steps
+    parser.add_argument('--target-period-update', type=int, default=20) # target networks are updated every target_period_update training steps
+    parser.add_argument('--nb-training-bc', type=int, default=20) # number of behaviour_cloning training step to be performed
     boolean_flag(parser, 'evaluation', default=False)
     args = parser.parse_args()
     # we don't directly specify timesteps for this script, so make sure that if we do specify them

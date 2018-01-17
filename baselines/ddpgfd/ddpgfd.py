@@ -55,7 +55,7 @@ def get_perturbed_actor_updates(actor, perturbed_actor, param_noise_stddev):
 
 
 class DDPGFD(object):
-    def __init__(self, actor, critic, memory, observation_shape, action_shape, eps, eps_d, lambda_3,  param_noise=None, action_noise=None,
+    def __init__(self, actor, critic, memory, observation_shape, action_shape, eps, eps_d, lambda_3,batch_size_bc,  param_noise=None, action_noise=None,
         gamma=0.99, tau=0.001, normalize_returns=False, enable_popart=False, normalize_observations=True,
         batch_size=128, observation_range=(-5., 5.), action_range=(-1., 1.), return_range=(-np.inf, np.inf),
         adaptive_param_noise=True, adaptive_param_noise_policy_threshold=.1,
@@ -90,6 +90,7 @@ class DDPGFD(object):
         self.enable_popart = enable_popart
         self.reward_scale = reward_scale
         self.batch_size = batch_size
+        self.batch_size_bc = batch_size_bc
         self.stats_sample = None
         self.critic_l2_reg = critic_l2_reg
         self.actor_l2_reg = actor_l2_reg
@@ -147,6 +148,7 @@ class DDPGFD(object):
             self.setup_param_noise(normalized_obs0)
         self.setup_actor_optimizer()
         self.setup_critic_optimizer()
+        self.setup_actor_optimizer_bc()
         if self.normalize_returns and self.enable_popart:
             self.setup_popart()
         self.setup_stats()
@@ -197,6 +199,14 @@ class DDPGFD(object):
         logger.info('  actor params: {}'.format(actor_nb_params))
         self.actor_grads = U.flatgrad(self.actor_loss, self.actor.trainable_vars, clip_norm=self.clip_norm)
         self.actor_optimizer = MpiAdam(var_list=self.actor.trainable_vars,
+            beta1=0.9, beta2=0.999, epsilon=1e-08)
+
+
+    def setup_actor_optimizer_bc(self):
+        logger.info('setting up actor optimizer')
+        self.actor_loss_bc = - tf.reduce_mean(tf.log(self.actor_tf - self.actions))
+        self.actor_grads_bc = U.flatgrad(self.actor_loss_bc, self.actor.trainable_vars, clip_norm=self.clip_norm)
+        self.actor_optimizer_bc = MpiAdam(var_list=self.actor.trainable_vars,
             beta1=0.9, beta2=0.999, epsilon=1e-08)
 
     def setup_critic_optimizer(self):
@@ -370,12 +380,24 @@ class DDPGFD(object):
         #batch_size = batch['obs1'].shape[0]
         #priority = 1/batch_size ** np.ones(batch_size)
         self.priority = self.sess.run(self.prior, feed_dict={
-            self.actions: self.memory.actions.get_batch(np.arange(self.memory.actions.length)),
-            self.obs0: self.memory.observations0.get_batch(np.arange(self.memory.actions.length)),
-            self.obs1: self.memory.observations1.get_batch(np.arange(self.memory.actions.length)),
-            self.rewards: self.memory.rewards.get_batch(np.arange(self.memory.rewards.length)).reshape(self.memory.rewards.length,1)
+            self.actions: self.memory.actions.get_batch(np.arange(self.memory.actions.data.length)),
+            self.obs0: self.memory.observations0.get_batch(np.arange(self.memory.actions.data.length)),
+            self.obs1: self.memory.observations1.get_batch(np.arange(self.memory.actions.data.length)),
+            self.rewards: self.memory.rewards.get_batch(np.arange(self.memory.rewards.data.length)).reshape(self.memory.rewards.data.slength,1)
         })
         return critic_loss, actor_loss
+
+    def behaviour_cloning(self):
+
+        batch = self.memory.sample(batch_size=self.batch_size_bc)
+
+        ops = [self.actor_grads_bc, self.actor_loss_bc]
+        actor_grads_bc, actor_loss_bc = self.sess.run(ops, feed_dict={
+            self.obs0: batch['obs0'],
+            self.actions: batch['actions'],
+            })
+
+        self.actor_optimizer.update(actor_grads_bc, stepsize=self.actor_lr)
 
     def initialize(self, sess):
         self.sess = sess

@@ -15,7 +15,7 @@ from mpi4py import MPI
 
 def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, param_noise, actor, critic,
     normalize_returns, normalize_observations, critic_l2_reg, actor_lr, critic_lr, action_noise,
-    popart, gamma, clip_norm, nb_train_steps, nb_rollout_steps, nb_eval_steps, batch_size, memory, eps, eps_d, lambda_3, target_period_update,
+    popart, gamma, clip_norm, nb_train_steps, nb_rollout_steps, nb_eval_steps, batch_size, batch_size_bc, memory, eps, eps_d, lambda_3, target_period_update, nb_training_bc,
     tau=0.01, eval_env=None, param_noise_adaption_interval=50):
     rank = MPI.COMM_WORLD.Get_rank()
 
@@ -24,7 +24,7 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
     logger.info('scaling actions by {} before executing in env'.format(max_action))
     agent = DDPGFD(actor, critic, memory, env.observation_space.shape, env.action_space.shape, eps, eps_d, lambda_3,
         gamma=gamma, tau=tau, normalize_returns=normalize_returns, normalize_observations=normalize_observations,
-        batch_size=batch_size, action_noise=action_noise, param_noise=param_noise, critic_l2_reg=critic_l2_reg,
+        batch_size=batch_size, batch_size_bc=batch_size_bc, action_noise=action_noise, param_noise=param_noise, critic_l2_reg=critic_l2_reg,
         actor_lr=actor_lr, critic_lr=critic_lr, enable_popart=popart, clip_norm=clip_norm,
         reward_scale=reward_scale)
     logger.info('Using agent with the following configuration:')
@@ -44,6 +44,10 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
         # Prepare everything.
         agent.initialize(sess)
         sess.graph.finalize()
+
+        for t_train_bc in range(nb_training_bc):
+            print('bc step')
+            agent.behaviour_cloning()
 
         agent.reset()
         obs = env.reset()
