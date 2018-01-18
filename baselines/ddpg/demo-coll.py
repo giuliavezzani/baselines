@@ -15,14 +15,14 @@ def main():
     for i_rollout in range(10):
         print('rollout_no: ', i_rollout)
 
-        returns = []
+        rewards = []
         observations0 = []
         actions = []
         observations1 = []
         terminals = []
 
         obs = env.reset()
-        episode_rew = 0
+        #episode_rew = 0
         done = False
 
         while not done:
@@ -33,19 +33,20 @@ def main():
             obs, rew, done, _ = env.step(action)
             actions.append(action)
             observations1.append(obs)
-            episode_rew += rew
+            #episode_rew += rew
+            rewards.append(rew)
             terminals.append(done)
-            returns.append(episode_rew)
+            
 
         expert_data = {'s0': np.array(observations0),
                        's1': np.array(observations1),
                        'a': np.array(actions),
-                       'r': np.array(returns),
+                       'r': np.array(rewards),
                        't': np.array(terminals)}
         print(np.array(observations0).shape)
         print(np.array(observations1).shape)
         print(np.array(actions).shape)
-        print(np.array(returns).shape)
+        print(np.array(rewards).shape)
         print(np.array(terminals).shape)
         experts.append(expert_data)
     np.save('demo-collected-2.npy', experts)

@@ -25,7 +25,7 @@ class Demo():
         self.rewards = rewards
         self.terms = terms
 
-def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo, alpha, eps, eps_d, target_period_update, lambda_3, nb_training_bc,t_inner_steps, **kwargs):
+def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo, alpha, eps, eps_d, target_period_update, lambda_3, nb_training_bc,t_inner_steps,n_value,gamma, **kwargs):
     # Configure things.
     rank = MPI.COMM_WORLD.Get_rank()
     if rank != 0:
@@ -66,7 +66,7 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo
     # Configure components.
 
     # Read the doemonstration
-    demonstrations = read_demo_file(demo_file)
+    demonstrations = read_demo_file(demo_file, n_value, gamma)
     nb_min_demo = len(demonstrations.obs0)
 
     memory = Memory(limit=int(1e6), action_shape=env.action_space.shape, observation_shape=env.observation_space.shape, nb_min_demo=nb_min_demo, demonstrations=demonstrations, alpha=alpha)
@@ -94,14 +94,20 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo
     if rank == 0:
         logger.info('total runtime: {}s'.format(time.time() - start_time))
 
-def read_demo_file(demo_file):
+def read_demo_file(demo_file, n_value, gamma):
 
     demo_dict = np.load(demo_file)
     obs0 = list()
     obs1 = list()
+    obsn = list()
     acts = list()
     rewards = list()
     terms = list()
+    rewardsn = list()
+    termsn = list()
+
+    print(demo_dict[0]['s0'].shape)
+    print(demo_dict[0]['r'].shape)
 
     for i in range(len(demo_dict)):
         obs0.append( demo_dict[i]['s0'] )
@@ -109,14 +115,37 @@ def read_demo_file(demo_file):
         acts.append( demo_dict[i]['a'] )
         rewards.append( demo_dict[i]['r'] )
         terms.append( demo_dict[i]['t'] )
+        obsn_single = np.zeros(shape=demo_dict[i]['s0'].shape)
+        termn_single = np.zeros(shape=demo_dict[i]['t'].shape)
+        rewn_single = np.zeros(shape=demo_dict[i]['r'].shape)
+        for j in range(len(demo_dict[i]['s0'])):
+            if (j + n_value <=  len(demo_dict[i]['s0']) - 1):
+                obsn_single[j] = demo_dict[i]['s0'][j + n_value]
+                termn_single[j] = demo_dict[i]['t'][j + n_value].astype('float32')
 
-    #import IPython
-    #IPython.embed()
+                for t in range(n_value - 1):
+                    rewn_single[t] += gamma ** (j + t) * demo_dict[i]['r'][j + t]
+            else:
+                obsn_single[j] = demo_dict[i]['s0'][len(demo_dict[i]['s0']) - 1]
+                for t in range(len(demo_dict[i]['s0']) - j ):
+                    termn_single[t + j]= 1.0
+                    rewn_single[t + j] += gamma ** (j + t) * demo_dict[i ]['r'][j + t]
+
+        termsn.append(termn_single.astype('bool'))
+        obsn.append(obsn_single)
+        rewardsn.append(rewn_single)
+
+
+    import IPython
+    IPython.embed()
     print('obs0', obs0[0].shape)
     print('obs1', obs1[0].shape)
+    print('obsn', obsn[0].shape)
     print('acts', acts[0].shape)
     print('reward', rewards[0].shape)
     print('terms', terms[0].shape)
+    print('rewardsn', rewardsn[0].shape)
+    print('termsn', termsn[0].shape)
 
     return Demo(np.vstack(obs0), np.vstack(obs1), np.vstack(acts), np.concatenate(rewards), np.concatenate(terms))
 
@@ -147,7 +176,7 @@ def parse_args():
     parser.add_argument('--noise-type', type=str, default='adaptive-param_0.2')  # choices are adaptive-param_xx, ou_xx, normal_xx, none
     parser.add_argument('--num-timesteps', type=int, default=None)
     parser.add_argument('--nb-min-demo', type=int, default=10) # minimum number of demo guaranteed in the replay buffer
-    parser.add_argument('--demo-file', type=str, default='demo-collected.npy') # minimum number of demo guaranteed in the replay buffer
+    parser.add_argument('--demo-file', type=str, default='demo-collected-2.npy') # minimum number of demo guaranteed in the replay buffer
     parser.add_argument('--alpha', type=float, default=0.3) # alpha value for priorization
     parser.add_argument('--eps', type=float, default=0.3) # constant for priorization computation
     parser.add_argument('--eps_d', type=float, default=0.3) # constant for priorization computation
@@ -155,6 +184,7 @@ def parse_args():
     parser.add_argument('--target-period-update', type=int, default=20) # target networks are updated every target_period_update training steps
     parser.add_argument('--nb-training-bc', type=int, default=20) # number of behaviour_cloning training step to be performed
     parser.add_argument('--t-inner-steps', type=int, default=20)
+    parser.add_argument('--n-value', type=int, default=20)
     boolean_flag(parser, 'evaluation', default=False)
     args = parser.parse_args()
     # we don't directly specify timesteps for this script, so make sure that if we do specify them
