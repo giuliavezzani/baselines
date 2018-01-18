@@ -15,14 +15,14 @@ from mpi4py import MPI
 
 def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, param_noise, actor, critic,
     normalize_returns, normalize_observations, critic_l2_reg, actor_lr, critic_lr, action_noise,
-    popart, gamma, clip_norm, nb_train_steps, nb_rollout_steps, nb_eval_steps, batch_size, batch_size_bc, memory, eps, eps_d, lambda_3, target_period_update, nb_training_bc,t_inner_steps,
+    popart, gamma, clip_norm, nb_train_steps, nb_rollout_steps, nb_eval_steps, batch_size, batch_size_bc, memory, eps, eps_d, lambda_3, target_period_update, nb_training_bc,t_inner_steps,n_value,
     tau=0.01, eval_env=None, param_noise_adaption_interval=50):
     rank = MPI.COMM_WORLD.Get_rank()
 
     assert (np.abs(env.action_space.low) == env.action_space.high).all()  # we assume symmetric actions.
     max_action = env.action_space.high
     logger.info('scaling actions by {} before executing in env'.format(max_action))
-    agent = DDPGFD(actor, critic, memory, env.observation_space.shape, env.action_space.shape, eps, eps_d, lambda_3,
+    agent = DDPGFD(actor, critic, memory, env.observation_space.shape, env.action_space.shape, eps, eps_d, lambda_3,n_value=n_value,
         gamma=gamma, tau=tau, normalize_returns=normalize_returns, normalize_observations=normalize_observations,
         batch_size=batch_size, batch_size_bc=batch_size_bc, t_inner_steps=t_inner_steps, action_noise=action_noise, param_noise=param_noise, critic_l2_reg=critic_l2_reg,
         actor_lr=actor_lr, critic_lr=critic_lr, enable_popart=popart, clip_norm=clip_norm,
@@ -69,11 +69,19 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
         epoch_actions = []
         epoch_qs = []
         epoch_episodes = 0
+        rollout_acts = []
+        rollout_obs0 = []
+        rollout_obs1 = []
+        rollout_rews = []
+        rollout_terms1 = []
         for epoch in range(nb_epochs):
             for cycle in range(nb_epoch_cycles):
                 # Perform rollouts.
-                for t_rollout in range(nb_rollout_steps):
+                #for t_rollout in range(nb_rollout_steps):
                     # Predict next action.
+                while not done:
+
+                    rollout_obs0.append(obs)
                     action, q = agent.pi(obs, apply_noise=True, compute_Q=True)
                     assert action.shape == env.action_space.shape
 
@@ -91,23 +99,28 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                     # Book-keeping.
                     epoch_actions.append(action)
                     epoch_qs.append(q)
-                    agent.store_transition(obs, action, r, new_obs, done)
+                    rollout_obs1.append(new_obs)
+                    rollout_acts.append(action)
+                    rollout_terms1.append(done)
+                    rollout_rews.append(r)
+
                     obs = new_obs
 
-                    if done:
+                    #if done:
                         # Episode done.
-                        epoch_episode_rewards.append(episode_reward)
-                        episode_rewards_history.append(episode_reward)
-                        epoch_episode_steps.append(episode_step)
-                        episode_reward = 0.
-                        episode_step = 0
-                        epoch_episodes += 1
-                        episodes += 1
+                epoch_episode_rewards.append(episode_reward)
+                episode_rewards_history.append(episode_reward)
+                epoch_episode_steps.append(episode_step)
+                episode_reward = 0.
+                episode_step = 0
+                epoch_episodes += 1
+                episodes += 1
 
-                        agent.reset()
-                        obs = env.reset()
+                agent.reset()
+                obs = env.reset()
 
                 # Train.
+                agent.store_transition(rollout_obs0, rollout_acts, rollout_rews, rollout_obs1, rollout_terms1)
                 epoch_actor_losses = []
                 epoch_critic_losses = []
                 epoch_adaptive_distances = []

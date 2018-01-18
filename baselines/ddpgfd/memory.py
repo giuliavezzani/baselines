@@ -56,8 +56,10 @@ class Memory(object):
         self.actions = DemoRingBuffer(limit, demonstrations.acts, nb_min_demo)
         self.rewards = DemoRingBuffer(limit, demonstrations.rewards, nb_min_demo)
         self.terminals1 = DemoRingBuffer(limit, demonstrations.terms, nb_min_demo)
-        #assert(observation_shape == demonstrations.obs1)
-        self.observations1 = DemoRingBuffer(limit, demonstrations.obs1, nb_min_demo)  ## maybe demonstration here are not necessary
+        self.observations1 = DemoRingBuffer(limit, demonstrations.obs1, nb_min_demo)
+        self.observationsn = DemoRingBuffer(limit, demonstrations.obsn, nb_min_demo)
+        self.terminalsn = DemoRingBuffer(limit, demonstrations.termsn, nb_min_demo)
+        self.rewardsn = DemoRingBuffer(limit, demonstrations.rewardsn, nb_min_demo)
 
     def sample(self, batch_size):
         # Draw such that we always have a proceeding element.
@@ -68,13 +70,19 @@ class Memory(object):
         action_batch = self.actions.get_batch(batch_idxs)
         reward_batch = self.rewards.get_batch(batch_idxs)
         terminal1_batch = self.terminals1.get_batch(batch_idxs)
+        rewardn_batch = self.rewardsn.get_batch(batch_idxs)
+        terminaln_batch = self.terminalsn.get_batch(batch_idxs)
+        obsn_batch = self.observationsn.get_batch(batch_idxs)
 
         result = {
             'obs0': array_min2d(obs0_batch),
             'obs1': array_min2d(obs1_batch),
+            'obsn': array_min2d(obsn_batch),
             'rewards': array_min2d(reward_batch),
+            'rewardsn': array_min2d(reward_batch),
             'actions': array_min2d(action_batch),
             'terminals1': array_min2d(terminal1_batch),
+            'terminalsn': array_min2d(terminaln_batch),
         }
         return result
 
@@ -93,17 +101,23 @@ class Memory(object):
         action_batch = self.actions.get_batch(self.batch_idxs)
         reward_batch = self.rewards.get_batch(self.batch_idxs)
         terminal1_batch = self.terminals1.get_batch(self.batch_idxs)
+        rewardn_batch = self.rewardsn.get_batch(self.batch_idxs)
+        terminaln_batch = self.terminalsn.get_batch(self.batch_idxs)
+        obsn_batch = self.observationsn.get_batch(self.batch_idxs)
 
         result = {
             'obs0': array_min2d(obs0_batch),
             'obs1': array_min2d(obs1_batch),
+            'obsn': array_min2d(obsn_batch),
             'rewards': array_min2d(reward_batch),
+            'rewardsn': array_min2d(reward_batch),
             'actions': array_min2d(action_batch),
             'terminals1': array_min2d(terminal1_batch),
+            'terminalsn': array_min2d(terminaln_batch),
         }
         return result
 
-    def append(self, obs0, action, reward, obs1, terminal1, training=True):
+    def append(self, obs0, obs1, obsn, action, reward, terminal1, terminalsn, rewardn, training=True):
         if not training:
             return
 
@@ -112,6 +126,9 @@ class Memory(object):
         self.rewards.append(reward)
         self.observations1.append(obs1)
         self.terminals1.append(terminal1)
+        self.observationsn.append(obsn)
+        self.terminalsn.append(terminalsn)
+        self.rewardsn.append(rewardn)
 
     @property
     def nb_entries(self):

@@ -18,12 +18,15 @@ import tensorflow as tf
 from mpi4py import MPI
 
 class Demo():
-    def __init__(self, obs0, obs1, acts, rewards, terms):
+    def __init__(self, obs0, obs1,obsn, acts, rewards, terms, termsn, rewardsn):
         self.obs0 = obs0
         self.obs1 = obs1
+        self.obsn = obsn
         self.acts = acts
         self.rewards = rewards
         self.terms = terms
+        self.rewardsn = rewardsn
+        self.termsn = termsn
 
 def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo, alpha, eps, eps_d, target_period_update, lambda_3, nb_training_bc,t_inner_steps,n_value,gamma, **kwargs):
     # Configure things.
@@ -85,8 +88,8 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo
     # Disable logging for rank != 0 to avoid noise.
     if rank == 0:
         start_time = time.time()
-    training.train(env=env, eval_env=eval_env, param_noise=param_noise,
-        action_noise=action_noise, actor=actor, critic=critic, memory=memory,
+    training.train(env=env, eval_env=eval_env, param_noise=param_noise, n_value= n_value,
+        action_noise=action_noise, actor=actor, critic=critic, memory=memory, gamma=gamma,
         eps=eps, eps_d=eps_d, lambda_3=lambda_3, target_period_update=target_period_update, nb_training_bc=nb_training_bc,t_inner_steps=t_inner_steps, **kwargs)
     env.close()
     if eval_env is not None:
@@ -136,8 +139,8 @@ def read_demo_file(demo_file, n_value, gamma):
         rewardsn.append(rewn_single)
 
 
-    import IPython
-    IPython.embed()
+    #import IPython
+    #IPython.embed()
     print('obs0', obs0[0].shape)
     print('obs1', obs1[0].shape)
     print('obsn', obsn[0].shape)
@@ -147,7 +150,7 @@ def read_demo_file(demo_file, n_value, gamma):
     print('rewardsn', rewardsn[0].shape)
     print('termsn', termsn[0].shape)
 
-    return Demo(np.vstack(obs0), np.vstack(obs1), np.vstack(acts), np.concatenate(rewards), np.concatenate(terms))
+    return Demo(np.vstack(obs0), np.vstack(obs1),np.vstack(obsn), np.vstack(acts), np.concatenate(rewards), np.concatenate(terms), np.concatenate(termsn), np.concatenate(rewardsn))
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)

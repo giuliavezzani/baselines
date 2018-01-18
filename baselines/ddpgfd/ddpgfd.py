@@ -55,7 +55,7 @@ def get_perturbed_actor_updates(actor, perturbed_actor, param_noise_stddev):
 
 
 class DDPGFD(object):
-    def __init__(self, actor, critic, memory, observation_shape, action_shape, eps, eps_d, lambda_3,batch_size_bc, t_inner_steps,  param_noise=None, action_noise=None,
+    def __init__(self, actor, critic, memory, observation_shape, action_shape, eps, eps_d, lambda_3,batch_size_bc, t_inner_steps,n_value,  param_noise=None, action_noise=None,
         gamma=0.99, tau=0.001, normalize_returns=False, enable_popart=False, normalize_observations=True,
         batch_size=128, observation_range=(-5., 5.), action_range=(-1., 1.), return_range=(-np.inf, np.inf),
         adaptive_param_noise=True, adaptive_param_noise_policy_threshold=.1,
@@ -65,8 +65,12 @@ class DDPGFD(object):
         self.obs1 = tf.placeholder(tf.float32, shape=(None,) + observation_shape, name='obs1')
         self.terminals1 = tf.placeholder(tf.float32, shape=(None, 1), name='terminals1')
         self.rewards = tf.placeholder(tf.float32, shape=(None, 1), name='rewards')
+        self.obsn = tf.placeholder(tf.float32, shape=(None,) + observation_shape, name='obsn')
+        self.terminalsn = tf.placeholder(tf.float32, shape=(None, 1), name='terminalsn')
+        self.rewardsn = tf.placeholder(tf.float32, shape=(None, 1), name='rewardsn')
         self.actions = tf.placeholder(tf.float32, shape=(None,) + action_shape, name='actions')
         self.critic_target = tf.placeholder(tf.float32, shape=(None, 1), name='critic_target')
+        self.critic_target_n = tf.placeholder(tf.float32, shape=(None, 1), name='critic_target_n')
         self.param_noise_stddev = tf.placeholder(tf.float32, shape=(), name='param_noise_stddev')
 
         self.priority_for_weights = tf.placeholder(tf.float32, shape=(None,1) , name='priority_for_weights')
@@ -100,6 +104,7 @@ class DDPGFD(object):
         self.beta = beta
         self.critic = critic
         self.t_inner_steps = t_inner_steps
+        self.n_value = n_value
         #self.weights = np.ones(shape=(batch_size, 1))
 
         # Observation normalization.
@@ -111,6 +116,8 @@ class DDPGFD(object):
         normalized_obs0 = tf.clip_by_value(normalize(self.obs0, self.obs_rms),
             self.observation_range[0], self.observation_range[1])
         normalized_obs1 = tf.clip_by_value(normalize(self.obs1, self.obs_rms),
+            self.observation_range[0], self.observation_range[1])
+        normalized_obsn = tf.clip_by_value(normalize(self.obsn, self.obs_rms),
             self.observation_range[0], self.observation_range[1])
 
         # Return normalization.
@@ -131,12 +138,18 @@ class DDPGFD(object):
         # Create networks and core TF parts that are shared across setup parts.
         self.actor_tf = actor(normalized_obs0)
         self.normalized_critic_tf = critic(normalized_obs0, self.actions)
-        self.normalized_critic_tf_1 = critic(normalized_obs1, self.actions, reuse=True)
+        #self.normalized_critic_tf_1 = critic(normalized_obs1, self.actions, reuse=True)
         self.critic_tf = denormalize(tf.clip_by_value(self.normalized_critic_tf, self.return_range[0], self.return_range[1]), self.ret_rms)
         self.normalized_critic_with_actor_tf = critic(normalized_obs0, self.actor_tf, reuse=True)
         self.critic_with_actor_tf = denormalize(tf.clip_by_value(self.normalized_critic_with_actor_tf, self.return_range[0], self.return_range[1]), self.ret_rms)
         Q_obs1 = denormalize(target_critic(normalized_obs1, target_actor(normalized_obs1)), self.ret_rms)
         self.target_Q = self.rewards + (1. - self.terminals1) * gamma * Q_obs1
+
+
+
+        # Cretae n-step critic loss
+        Q_obsn = denormalize(target_critic(normalized_obsn, target_actor(normalized_obsn, reuse=True), reuse=True), self.ret_rms)
+        self.target_Q_n = self.rewardsn + (1. - self.terminalsn) * gamma ** self.n_value * Q_obs1
 
         # Create core TF for computing priority
         #self.TDerror = self.rewards + self.gamma * (self.normalized_critic_tf_1 - self.normalized_critic_tf)
@@ -225,6 +238,11 @@ class DDPGFD(object):
                 weights_list=critic_reg_vars
             )
             self.critic_loss += critic_reg
+
+        # N steo critic loss
+        normalized_critic_target_tf_n = tf.clip_by_value(normalize(self.critic_target_n, self.ret_rms), self.return_range[0], self.return_range[1])
+        critic_loss_n = tf.reduce_mean((np.multiply(tf.square(self.normalized_critic_tf - normalized_critic_target_tf_n), self.weights)))
+        self.critic_loss += critic_loss_n
         critic_shapes = [var.get_shape().as_list() for var in self.critic.trainable_vars]
         critic_nb_params = sum([reduce(lambda x, y: x * y, shape) for shape in critic_shapes])
         logger.info('  critic shapes: {}'.format(critic_shapes))
@@ -307,15 +325,61 @@ class DDPGFD(object):
         return action, q
 
     def store_transition(self, obs0, action, reward, obs1, terminal1):
-        reward *= self.reward_scale
-        self.memory.append(obs0, action, reward, obs1, terminal1)
+        #import IPython
+        #IPython.embed()
+        for i in range(len(reward)):
+            reward[i] = reward[i] * self.reward_scale
+
+        #import IPython
+        #IPython.embed()
+        #obsn = list()
+        #rewardsn = list()
+        #terminalsn = list()
+
+        #for i in range(len(obs0)):
+        obsn_single = list()
+        # np.zeros(shape=(len(obs0), obs0[0].shape[0]))
+        termn_single = list()
+        #np.zeros(len(terminal1))
+        rewn_single = list()
+        #np.zeros(len(reward))
+        #import IPython
+        #IPython.embed()
+        for j in range(len(obs0)):
+            rew = 0.
+            if (j + self.n_value <=  len(obs0) - 1):
+                obsn_single.append(obs0[j + self.n_value])
+                termn_single.append( terminal1[j + self.n_value].astype('float32'))
+
+                for t in range(self.n_value - 1):
+                    rew += self.gamma ** (j + t) * reward[j + t]
+                rewn.append(rew)
+            else:
+                obsn_single.append(obs0[len(obs0) - 1])
+                for t in range(len(obs0) - j ):
+                    rew +=  self.gamma ** (j) * reward[j + t]
+                rewn_single.append(rew)
+                termn_single.append(1.0)
+
+        #terminalsn.append(termn_single.astype('bool'))
+        #obsn.append(obsn_single)
+        #rewardsn.append(rewn_single)
+
+        #import IPython
+        #IPython.embed()
+
+        for i in range(len(obs0)):
+            self.memory.append(obs0[0], obs1[0], obsn_single[0], action[0], reward[0],  terminal1[0], termn_single[0], rewn_single[0])
         if self.normalize_observations:
-            self.obs_rms.update(np.array([obs0]))
+            self.obs_rms.update(np.array([obs0[0]]))
 
     def train(self, num_iter):
         # Get a batch.
         #batch = self.memory.sample(batch_size=self.batch_size)
         #Sample with priorization
+        print(num_iter)
+        #import IPython
+        #IPython.embed()
         if num_iter == 0:
             batch = self.memory.sample(batch_size=self.batch_size)
             #priority = np.ones(shape=(self.memory.observations0.length, ))
@@ -326,12 +390,17 @@ class DDPGFD(object):
         #self.weights = ( 1 / self.batch_size * 1 / priority ) ** self.beta
 
         if self.normalize_returns and self.enable_popart:
-            old_mean, old_std, target_Q = self.sess.run([self.ret_rms.mean, self.ret_rms.std, self.target_Q], feed_dict={
+            old_mean, old_std, target_Q,target_Q_n = self.sess.run([self.ret_rms.mean, self.ret_rms.std, self.target_Q, self.target_Q_n], feed_dict={
                 self.obs1: batch['obs1'],
                 self.rewards: batch['rewards'],
                 self.terminals1: batch['terminals1'].astype('float32'),
+                self.obsn: batch['obsn'],
+                self.rewardsn: batch['rewardsn'],
+                self.terminalsn: batch['terminalsn'].astype('float32'),
             })
             self.ret_rms.update(target_Q.flatten())
+            self.ret_rms.update(target_Q_n.flatten())
+            ### TODO
             self.sess.run(self.renormalize_Q_outputs_op, feed_dict={
                 self.old_std : np.array([old_std]),
                 self.old_mean : np.array([old_mean]),
@@ -347,10 +416,13 @@ class DDPGFD(object):
             # print(target_Q_new, target_Q, new_mean, new_std)
             # assert (np.abs(target_Q - target_Q_new) < 1e-3).all()
         else:
-            target_Q = self.sess.run(self.target_Q, feed_dict={
+            target_Q, target_Q_n = self.sess.run([self.target_Q, self.target_Q_n], feed_dict={
                 self.obs1: batch['obs1'],
                 self.rewards: batch['rewards'],
                 self.terminals1: batch['terminals1'].astype('float32'),
+                self.obsn: batch['obsn'],
+                self.rewardsn: batch['rewardsn'],
+                self.terminalsn: batch['terminalsn'].astype('float32'),
             })
 
         # Multiple learning steps
@@ -362,6 +434,7 @@ class DDPGFD(object):
                     self.obs0: batch['obs0'],
                     self.actions: batch['actions'],
                     self.critic_target: target_Q,
+                    self.critic_target_n: target_Q_n,
                     self.priority_for_weights: np.ones(shape= batch['rewards'].shape)
                 })
 
@@ -373,6 +446,7 @@ class DDPGFD(object):
                     self.obs0: batch['obs0'],
                     self.actions: batch['actions'],
                     self.critic_target: target_Q,
+                    self.critic_target_n: target_Q_n,
                     self.priority_for_weights: self.priority[self.memory.batch_idxs]
                 })
 
