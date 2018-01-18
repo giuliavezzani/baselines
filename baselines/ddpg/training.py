@@ -138,9 +138,9 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                             eval_episode_rewards_history.append(eval_episode_reward)
                             eval_episode_reward = 0.
 
-                if np.mod(epoch, 2) == 0:
-                    save_path = saver.save(sess, '/tmp/models/ddpg'+'-env-' + str(env_id) +'.ckpt', global_step=epoch)
-                    print('Model saved in ', save_path)
+            if np.mod(epoch, 2) == 0:
+                save_path = saver.save(sess, '/tmp/models/ddpg'+'-env-' + str(env_id) +'.ckpt', global_step=epoch)
+                print('Model saved in ', save_path)
 
             # Log stats.
             epoch_train_duration = time.time() - epoch_start_time
@@ -194,7 +194,7 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
 
 def execute(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, param_noise, actor, critic,
     normalize_returns, normalize_observations, critic_l2_reg, actor_lr, critic_lr, action_noise,
-    popart, gamma, clip_norm, nb_train_steps, nb_rollout_steps, nb_eval_steps, batch_size, memory, env_id, model_name,saving_folder, 
+    popart, gamma, clip_norm, nb_train_steps, nb_rollout_steps, nb_eval_steps, batch_size, memory, env_id, model_name,saving_folder,
     tau=0.01, eval_env=None, param_noise_adaption_interval=50):
 
     rank = MPI.COMM_WORLD.Get_rank()
