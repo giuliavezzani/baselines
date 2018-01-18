@@ -6,7 +6,7 @@ class DemoRingBuffer(object):
         self.maxlen = maxlen
         self.start = 0
         self.nb_min_demo = nb_min_demo
-        self.length = 0
+        self.length = nb_min_demo
         self.data =  [data[i] for i in range(len(data))]
 
     def __len__(self):
@@ -118,4 +118,4 @@ class Memory(object):
     @property
     def nb_entries(self):
         #return len(self.observations0)
-        return len(self.observations0.data)
+        return len(self.observations0)

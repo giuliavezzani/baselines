@@ -380,10 +380,10 @@ class DDPGFD(object):
         #batch_size = batch['obs1'].shape[0]
         #priority = 1/batch_size ** np.ones(batch_size)
         self.priority = self.sess.run(self.prior, feed_dict={
-            self.actions: self.memory.actions.get_batch(np.arange(self.memory.actions.data.length)),
-            self.obs0: self.memory.observations0.get_batch(np.arange(self.memory.actions.data.length)),
-            self.obs1: self.memory.observations1.get_batch(np.arange(self.memory.actions.data.length)),
-            self.rewards: self.memory.rewards.get_batch(np.arange(self.memory.rewards.data.length)).reshape(self.memory.rewards.data.slength,1)
+            self.actions: self.memory.actions.get_batch(np.arange(len(self.memory.actions))),
+            self.obs0: self.memory.observations0.get_batch(np.arange(len(self.memory.actions))),
+            self.obs1: self.memory.observations1.get_batch(np.arange(len(self.memory.actions))),
+            self.rewards: self.memory.rewards.get_batch(np.arange(len(self.memory.actions))).reshape(len(self.memory.actions),1)
         })
         return critic_loss, actor_loss
 
