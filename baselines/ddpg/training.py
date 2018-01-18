@@ -139,7 +139,8 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                             eval_episode_reward = 0.
 
                 if np.mod(epoch, 2) == 0:
-                    saver.save(sess, '/tmp/models/ddpg'+'-env-' + str(env_id) , global_step=epoch)
+                    save_path = saver.save(sess, '/tmp/models/ddpg'+'-env-' + str(env_id) +'.ckpt', global_step=epoch)
+                    print('Model saved in ', save_path)
 
             # Log stats.
             epoch_train_duration = time.time() - epoch_start_time
@@ -191,7 +192,11 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                         pickle.dump(eval_env.get_state(), f)
 
 
-def execute(env, actor, critic, , model_name):
+def execute(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, param_noise, actor, critic,
+    normalize_returns, normalize_observations, critic_l2_reg, actor_lr, critic_lr, action_noise,
+    popart, gamma, clip_norm, nb_train_steps, nb_rollout_steps, nb_eval_steps, batch_size, memory, env_id, model_name,saving_folder, 
+    tau=0.01, eval_env=None, param_noise_adaption_interval=50):
+
     rank = MPI.COMM_WORLD.Get_rank()
 
     assert (np.abs(env.action_space.low) == env.action_space.high).all()  # we assume symmetric actions.
@@ -208,11 +213,17 @@ def execute(env, actor, critic, , model_name):
     with U.single_threaded_session() as sess:
         # Prepare everything.
         agent.initialize(sess)
-        tf.train.Safer.restore(sess, model_name)
+        saver = tf.train.Saver()
+        saver.restore(sess, model_name)
         sess.graph.finalize()
 
+        experts = []
+
+        current_time = time.localtime()
+        print(time.strftime('%Y-%m-%d-%H-%M-%S'), current_time)
+
         #agent.reset()
-        for i_rollout in range(10):
+        for i_rollout in range(nb_rollout_steps):
             print('rollout_no: ', i_rollout)
 
             returns = []
@@ -229,11 +240,13 @@ def execute(env, actor, critic, , model_name):
                 env.render()
                 #action = act(obs[None, :])
                 observations0.append(obs)
-                action = env.action_space.sample()
-                obs, rew, done, _ = env.step(action)
+                action, q = agent.pi(obs)
+
+                assert max_action.shape == action.shape
+                new_obs, r, done, info = env.step(max_action * action)
                 actions.append(action)
                 observations1.append(obs)
-                episode_rew += rew
+                episode_rew += r
                 terminals.append(done)
                 returns.append(episode_rew)
 
@@ -242,10 +255,5 @@ def execute(env, actor, critic, , model_name):
                            'a': np.array(actions),
                            'r': np.array(returns),
                            't': np.array(terminals)}
-            print(np.array(observations0).shape)
-            print(np.array(observations1).shape)
-            print(np.array(actions).shape)
-            print(np.array(returns).shape)
-            print(np.array(terminals).shape)
-            experts.append(expert_data)
-        np.save('demo-collected-2.npy', experts)
+
+        np.save(saving_folder + 'demo-collected-'+env_id+'-'+time.strftime('%Y-%m-%d-%H-%M-%S', current_time)+'.npy', experts)
