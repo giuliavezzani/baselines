@@ -86,8 +86,6 @@ class Memory(object):
         priority_alpha = priority_alpha / np.sum(priority_alpha)
         #print(priority_alpha[:,0])
         #self.batch_idxs = np.random.choice(self.nb_entries, size=batch_size, p=priority_alpha[:,0])
-        print(self.nb_entries)
-        print(len(priority_alpha[:,0]))
         self.batch_idxs = np.random.choice(self.nb_entries, size=batch_size, p=priority_alpha[:,0])
 
         obs0_batch = self.observations0.get_batch(self.batch_idxs)

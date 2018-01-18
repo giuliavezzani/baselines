@@ -100,7 +100,6 @@ class DDPGFD(object):
         self.beta = beta
         self.critic = critic
         self.t_inner_steps = t_inner_steps
-        print('observation_shape', observation_shape)
         #self.weights = np.ones(shape=(batch_size, 1))
 
         # Observation normalization.
@@ -181,7 +180,7 @@ class DDPGFD(object):
 
     def setup_actor_optimizer(self):
         logger.info('setting up actor optimizer')
-        # Weighted sum
+        # Weighted sm
         self.actor_loss = -tf.reduce_sum(np.multiply(self.critic_with_actor_tf, self.weights))
         #self.actor_loss = -tf.reduce_mean(self.critic_with_actor_tf)
         # Adding regularization also for actor
@@ -316,7 +315,6 @@ class DDPGFD(object):
     def train(self, num_iter):
         # Get a batch.
         #batch = self.memory.sample(batch_size=self.batch_size)
-        print('num_iter', num_iter)
         #Sample with priorization
         if num_iter == 0:
             batch = self.memory.sample(batch_size=self.batch_size)
@@ -394,6 +392,8 @@ class DDPGFD(object):
             self.rewards: self.memory.rewards.get_batch(np.arange(len(self.memory.actions))).reshape(len(self.memory.actions),1),
             self.terminals1: self.memory.terminals1.get_batch(np.arange(len(self.memory.terminals1))).reshape(len(self.memory.terminals1),1).astype('float32')
         })
+
+        #print('priority sum', np.sum(self.priority))
         return critic_loss, actor_loss
 
     def behaviour_cloning(self):

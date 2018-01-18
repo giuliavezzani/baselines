@@ -46,7 +46,6 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
         sess.graph.finalize()
 
         for t_train_bc in range(nb_training_bc):
-            print('bc step')
             agent.behaviour_cloning()
 
         agent.reset()
@@ -79,12 +78,12 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                     assert action.shape == env.action_space.shape
 
                     # Execute next action.
-                    if rank == 0 and render:
+                    if rank == 0 and render and epoch/nb_epochs >= 0.8:
                         env.render()
                     assert max_action.shape == action.shape
                     new_obs, r, done, info = env.step(max_action * action)  # scale for execution in env (as far as DDPGfD is concerned, every action is in [-1, 1])
                     t += 1
-                    if rank == 0 and render:
+                    if rank == 0 and render and epoch/nb_epochs >= 0.8:
                         env.render()
                     episode_reward += r
                     episode_step += 1
