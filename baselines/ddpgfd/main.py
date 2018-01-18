@@ -67,6 +67,8 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo
 
     # Read the doemonstration
     demonstrations = read_demo_file(demo_file)
+    nb_min_demo = len(demonstrations.obs0)
+
     memory = Memory(limit=int(1e6), action_shape=env.action_space.shape, observation_shape=env.observation_space.shape, nb_min_demo=nb_min_demo, demonstrations=demonstrations, alpha=alpha)
     critic = Critic(layer_norm=layer_norm)
     actor = Actor(nb_actions, layer_norm=layer_norm)
