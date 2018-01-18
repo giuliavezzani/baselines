@@ -140,7 +140,7 @@ class DDPGFD(object):
 
         # Create core TF for computing priority
         #self.TDerror = self.rewards + self.gamma * (self.normalized_critic_tf_1 - self.normalized_critic_tf)
-        self.TDerror = self.normalized_critic_tf - tf.clip_by_value(normalize(self.target_Q, self.ret_rms), self.return_range[0], self.return_range[1])
+        self.TDerror = self.normalized_critic_tf - tf.clip_by_value(normalize(tf.stop_gradient(self.target_Q), self.ret_rms), self.return_range[0], self.return_range[1])
         self.prior = tf.pow(self.TDerror, 2) + self.lambda_3 * tf.pow(tf.norm((tf.gradients(self.normalized_critic_tf, self.actions))), 2) + self.eps + self.eps_d
 
         self.weights = 1 / self.batch_size * np.divide(1, self.priority_for_weights)
