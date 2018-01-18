@@ -140,7 +140,8 @@ class DDPGFD(object):
         self.target_Q = self.rewards + (1. - self.terminals1) * gamma * Q_obs1
 
         # Create core TF for computing priority
-        self.TDerror = self.rewards + self.gamma * (self.normalized_critic_tf_1 - self.normalized_critic_tf)
+        #self.TDerror = self.rewards + self.gamma * (self.normalized_critic_tf_1 - self.normalized_critic_tf)
+        self.TDerror = self.normalized_critic_tf - tf.clip_by_value(normalize(self.target_Q, self.ret_rms), self.return_range[0], self.return_range[1])
         self.prior = tf.pow(self.TDerror, 2) + self.lambda_3 * tf.pow(tf.norm((tf.gradients(self.normalized_critic_tf, self.actions))), 2) + self.eps + self.eps_d
 
         self.weights = 1 / self.batch_size * np.divide(1, self.priority_for_weights)
@@ -390,7 +391,8 @@ class DDPGFD(object):
             self.actions: self.memory.actions.get_batch(np.arange(len(self.memory.actions))),
             self.obs0: self.memory.observations0.get_batch(np.arange(len(self.memory.actions))),
             self.obs1: self.memory.observations1.get_batch(np.arange(len(self.memory.actions))),
-            self.rewards: self.memory.rewards.get_batch(np.arange(len(self.memory.actions))).reshape(len(self.memory.actions),1)
+            self.rewards: self.memory.rewards.get_batch(np.arange(len(self.memory.actions))).reshape(len(self.memory.actions),1),
+            self.terminals1: self.memory.terminals1.get_batch(np.arange(len(self.memory.terminals1))).reshape(len(self.memory.terminals1),1).astype('float32')
         })
         return critic_loss, actor_loss
 
