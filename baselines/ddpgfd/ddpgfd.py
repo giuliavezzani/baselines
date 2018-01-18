@@ -55,7 +55,7 @@ def get_perturbed_actor_updates(actor, perturbed_actor, param_noise_stddev):
 
 
 class DDPGFD(object):
-    def __init__(self, actor, critic, memory, observation_shape, action_shape, eps, eps_d, lambda_3,batch_size_bc,  param_noise=None, action_noise=None,
+    def __init__(self, actor, critic, memory, observation_shape, action_shape, eps, eps_d, lambda_3,batch_size_bc, t_inner_steps,  param_noise=None, action_noise=None,
         gamma=0.99, tau=0.001, normalize_returns=False, enable_popart=False, normalize_observations=True,
         batch_size=128, observation_range=(-5., 5.), action_range=(-1., 1.), return_range=(-np.inf, np.inf),
         adaptive_param_noise=True, adaptive_param_noise_policy_threshold=.1,
@@ -99,6 +99,7 @@ class DDPGFD(object):
         self.lambda_3 = lambda_3
         self.beta = beta
         self.critic = critic
+        self.t_inner_steps = t_inner_steps
         print('observation_shape', observation_shape)
         #self.weights = np.ones(shape=(batch_size, 1))
 
@@ -353,29 +354,35 @@ class DDPGFD(object):
                 self.terminals1: batch['terminals1'].astype('float32'),
             })
 
-        # Get all gradients and perform a synced update.
-        if num_iter == 0:
-            ops = [self.actor_grads, self.actor_loss, self.critic_grads, self.critic_loss]
-            actor_grads, actor_loss, critic_grads, critic_loss = self.sess.run(ops, feed_dict={
-                self.obs0: batch['obs0'],
-                self.actions: batch['actions'],
-                self.critic_target: target_Q,
-                self.priority_for_weights: np.ones(shape= batch['rewards'].shape)
-            })
-        else:
-            ops = [self.actor_grads, self.actor_loss, self.critic_grads, self.critic_loss]
-            actor_grads, actor_loss, critic_grads, critic_loss = self.sess.run(ops, feed_dict={
-                self.obs0: batch['obs0'],
-                self.actions: batch['actions'],
-                self.critic_target: target_Q,
-                self.priority_for_weights: self.priority[self.memory.batch_idxs]
-            })
+        # Multiple learning steps
+        for t_learn in np.arange(self.t_inner_steps):
+            # Get all gradients and perform a synced update.
+            if num_iter == 0:
+                ops = [self.actor_grads, self.actor_loss, self.critic_grads, self.critic_loss]
+                actor_grads, actor_loss, critic_grads, critic_loss = self.sess.run(ops, feed_dict={
+                    self.obs0: batch['obs0'],
+                    self.actions: batch['actions'],
+                    self.critic_target: target_Q,
+                    self.priority_for_weights: np.ones(shape= batch['rewards'].shape)
+                })
+
+                self.actor_optimizer.update(actor_grads, stepsize=self.actor_lr)
+                self.critic_optimizer.update(critic_grads, stepsize=self.critic_lr)
+            else:
+                ops = [self.actor_grads, self.actor_loss, self.critic_grads, self.critic_loss]
+                actor_grads, actor_loss, critic_grads, critic_loss = self.sess.run(ops, feed_dict={
+                    self.obs0: batch['obs0'],
+                    self.actions: batch['actions'],
+                    self.critic_target: target_Q,
+                    self.priority_for_weights: self.priority[self.memory.batch_idxs]
+                })
+
+                self.actor_optimizer.update(actor_grads, stepsize=self.actor_lr)
+                self.critic_optimizer.update(critic_grads, stepsize=self.critic_lr)
 
         #TDerror = batch['rewards'] + self.gamma * (self.normalized_critic_tf_1 - self.normalized_critic_tf)
         #prior = TDerror + self.lambda_3 * (tf.gradients(self.normalized_critic_tf)) ** 2 + self.eps + self.eps_d
 
-        self.actor_optimizer.update(actor_grads, stepsize=self.actor_lr)
-        self.critic_optimizer.update(critic_grads, stepsize=self.critic_lr)
 
         #batch_size = batch['obs1'].shape[0]
         #priority = 1/batch_size ** np.ones(batch_size)
