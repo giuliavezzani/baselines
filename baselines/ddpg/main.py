@@ -67,12 +67,14 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, **kwargs):
     env.seed(seed)
     if eval_env is not None:
         eval_env.seed(seed)
-
     # Disable logging for rank != 0 to avoid noise.
     if rank == 0:
         start_time = time.time()
-    training.train(env=env, eval_env=eval_env, param_noise=param_noise,
-        action_noise=action_noise, actor=actor, critic=critic, memory=memory,env_id=env_id, **kwargs)
+    if execution is False:
+        training.train(env=env, eval_env=eval_env, param_noise=param_noise,
+        action_noise=action_noise, actor=actor, critic=critic, memory=memory,env_id=env_id, **kwargs
+    else:
+        training.execute(env=env, actor=actor, critic=critic, memory=memory, **kwargs)
     env.close()
     if eval_env is not None:
         eval_env.close()
@@ -106,6 +108,8 @@ def parse_args():
     parser.add_argument('--noise-type', type=str, default='adaptive-param_0.2')  # choices are adaptive-param_xx, ou_xx, normal_xx, none
     parser.add_argument('--num-timesteps', type=int, default=None)
     boolean_flag(parser, 'evaluation', default=False)
+    boolean_flag(parser, 'execution', default=False)
+    parser.add_argument('--model-name', type=str, default='') 
     args = parser.parse_args()
     # we don't directly specify timesteps for this script, so make sure that if we do specify them
     # they agree with the other parameters
