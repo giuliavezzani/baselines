@@ -180,7 +180,7 @@ class DDPGFD(object):
     def setup_actor_optimizer(self):
         logger.info('setting up actor optimizer')
         # Weighted sum
-        self.actor_loss = -tf.reduce_mean(np.multiply(self.critic_with_actor_tf, self.weights))
+        self.actor_loss = -tf.reduce_sum(np.multiply(self.critic_with_actor_tf, self.weights))
         #self.actor_loss = -tf.reduce_mean(self.critic_with_actor_tf)
         # Adding regularization also for actor
         if self.actor_l2_reg > 0.:
@@ -204,7 +204,7 @@ class DDPGFD(object):
 
     def setup_actor_optimizer_bc(self):
         logger.info('setting up actor optimizer')
-        self.actor_loss_bc = - tf.reduce_mean(tf.log(self.actor_tf - self.actions))
+        self.actor_loss_bc = tf.reduce_mean(tf.reduce_sum(tf.square(self.actor_tf - self.actions), axis=1))
         self.actor_grads_bc = U.flatgrad(self.actor_loss_bc, self.actor.trainable_vars, clip_norm=self.clip_norm)
         self.actor_optimizer_bc = MpiAdam(var_list=self.actor.trainable_vars,
             beta1=0.9, beta2=0.999, epsilon=1e-08)
