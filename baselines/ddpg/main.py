@@ -16,7 +16,7 @@ import gym
 import tensorflow as tf
 from mpi4py import MPI
 
-def run(env_id, seed, noise_type, layer_norm, evaluation, **kwargs):
+def run(env_id, seed, noise_type, layer_norm, evaluation,model_name, execution, **kwargs):
     # Configure things.
     rank = MPI.COMM_WORLD.Get_rank()
     if rank != 0:
@@ -74,7 +74,7 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, **kwargs):
         training.train(env=env, eval_env=eval_env, param_noise=param_noise,
         action_noise=action_noise, actor=actor, critic=critic, memory=memory,env_id=env_id, **kwargs
     else:
-        training.execute(env=env, actor=actor, critic=critic, memory=memory, **kwargs)
+        training.execute(env=env, actor=actor, critic=critic, memory=memory, model_name=model_name, **kwargs)
     env.close()
     if eval_env is not None:
         eval_env.close()
@@ -85,7 +85,7 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, **kwargs):
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument('--env-id', type=str, default='HalfCheetah-v1')
+    parser.add_argument('--env-id', type=str, default='Hopper-v1')
     boolean_flag(parser, 'render-eval', default=False)
     boolean_flag(parser, 'layer-norm', default=True)
     boolean_flag(parser, 'render', default=False)
@@ -109,7 +109,7 @@ def parse_args():
     parser.add_argument('--num-timesteps', type=int, default=None)
     boolean_flag(parser, 'evaluation', default=False)
     boolean_flag(parser, 'execution', default=False)
-    parser.add_argument('--model-name', type=str, default='') 
+    parser.add_argument('--model-name', type=str, default='/tmp/models/ddpg-env-Hopper-v1')
     args = parser.parse_args()
     # we don't directly specify timesteps for this script, so make sure that if we do specify them
     # they agree with the other parameters
