@@ -238,7 +238,7 @@ def execute(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, 
         for i_rollout in range(nb_rollout_steps):
             print('rollout_no: ', i_rollout)
 
-            returns = []
+            rewards = []
             observations0 = []
             actions = []
             observations1 = []
@@ -258,14 +258,14 @@ def execute(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, 
                 new_obs, r, done, info = env.step(max_action * action)
                 actions.append(action)
                 observations1.append(obs)
-                episode_rew += r
                 terminals.append(done)
-                returns.append(episode_rew)
+                rewards.append(r)
 
             expert_data = {'s0': np.array(observations0),
                            's1': np.array(observations1),
                            'a': np.array(actions),
-                           'r': np.array(returns),
+                           'r': np.array(rewards),
                            't': np.array(terminals)}
+            experts.append(expert_data)
 
         np.save(saving_folder + 'demo-collected-'+env_id+'-'+time.strftime('%Y-%m-%d-%H-%M-%S', current_time)+'.npy', experts)

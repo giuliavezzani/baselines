@@ -129,7 +129,7 @@ def read_demo_file(demo_file, n_value, gamma):
                 obsn_single[j] = demo_dict[i]['s0'][len(demo_dict[i]['s0']) - 1]
                 for t in range(len(demo_dict[i]['s0']) - j ):
                     termn_single[t + j]= 1.0
-                    rewn_single[t + j] += gamma ** (j + t) * demo_dict[i ]['r'][j + t]
+                    rewn_single[t + j] += gamma ** (j) * demo_dict[i ]['r'][j + t]
 
         termsn.append(termn_single.astype('bool'))
         obsn.append(obsn_single)
