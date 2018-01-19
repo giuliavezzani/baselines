@@ -2,12 +2,14 @@ import numpy as np
 
 
 class DemoRingBuffer(object):
-    def __init__(self, maxlen, data, nb_min_demo, dtype='float32'):
+    def __init__(self, maxlen, data, nb_min_demo,shape, dtype='float32'):
         self.maxlen = maxlen
         self.start = 0
         self.nb_min_demo = nb_min_demo
         self.length = nb_min_demo
-        self.data =  [data[i] for i in range(len(data))]
+        self.data = np.zeros((maxlen,) + shape).astype(dtype)
+        for i in range(len(data)):
+            self.data[i] =  data[i]
 
     def __len__(self):
         return self.length
@@ -15,7 +17,7 @@ class DemoRingBuffer(object):
     def __getitem__(self, idx):
         if idx < 0 or idx >= self.length:
             raise KeyError()
-        return  np.asarray(self.data[(self.start + idx) % self.maxlen])
+        return np.asarray(self.data[(self.start + idx) % self.maxlen])
 
     def get_batch(self, idxs):
         self.data_array=np.asarray(self.data)
@@ -28,13 +30,12 @@ class DemoRingBuffer(object):
         elif self.length == self.maxlen:
             # No space, "remove" the (nb-min-demo + 1)-th element
             # and replace with the new one
-            for i in arange(0, self.nb_min_demo):
-                self.data[i + 1] = self.data[i]
             self.start = (self.start + 1) % self.maxlen
         else:
             # This should never happen.
             raise RuntimeError()
-        self.data.append(v)
+        self.data[(self.start + self.length - 1) % self.maxlen] = v
+
 
 def array_min2d(x):
     x = np.array(x)
@@ -51,14 +52,14 @@ class Memory(object):
         assert( alpha > 0 )
         self.alpha = alpha
 
-        self.observations0 = DemoRingBuffer(limit,demonstrations.obs0, nb_min_demo)
-        self.actions = DemoRingBuffer(limit, demonstrations.acts, nb_min_demo)
-        self.rewards = DemoRingBuffer(limit, demonstrations.rewards, nb_min_demo)
-        self.terminals1 = DemoRingBuffer(limit, demonstrations.terms, nb_min_demo)
-        self.observations1 = DemoRingBuffer(limit, demonstrations.obs1, nb_min_demo)
-        self.observationsn = DemoRingBuffer(limit, demonstrations.obsn, nb_min_demo)
-        self.terminalsn = DemoRingBuffer(limit, demonstrations.termsn, nb_min_demo)
-        self.rewardsn = DemoRingBuffer(limit, demonstrations.rewardsn, nb_min_demo)
+        self.observations0 = DemoRingBuffer(limit,demonstrations.obs0, nb_min_demo, shape=observation_shape)
+        self.actions = DemoRingBuffer(limit, demonstrations.acts,nb_min_demo,shape=action_shape)
+        self.rewards = DemoRingBuffer(limit, demonstrations.rewards,nb_min_demo ,shape=(1,))
+        self.terminals1 = DemoRingBuffer(limit, demonstrations.terms, nb_min_demo,shape=(1,))
+        self.observations1 = DemoRingBuffer(limit, demonstrations.obs1,nb_min_demo,shape=observation_shape)
+        self.observationsn = DemoRingBuffer(limit, demonstrations.obsn,nb_min_demo,shape=observation_shape)
+        self.terminalsn = DemoRingBuffer(limit, demonstrations.termsn,nb_min_demo,shape=(1,))
+        self.rewardsn = DemoRingBuffer(limit, demonstrations.rewardsn,nb_min_demo,shape=(1,))
 
         #import IPython
         #IPython.embed()
