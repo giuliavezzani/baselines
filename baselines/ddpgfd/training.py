@@ -15,18 +15,19 @@ from mpi4py import MPI
 
 def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, param_noise, actor, critic,
     normalize_returns, normalize_observations, critic_l2_reg, actor_lr, critic_lr, action_noise,
-    popart, gamma, clip_norm, nb_train_steps, nb_rollout_steps, nb_eval_steps, batch_size, batch_size_bc, memory, eps, eps_d, lambda_3, lambda_n,  target_period_update, nb_training_bc,t_inner_steps,n_value,
+    popart, gamma, clip_norm, nb_train_steps, nb_rollout_steps, nb_eval_steps, batch_size, batch_size_bc,
+    memory, eps, eps_d, lambda_3, lambda_n,  target_period_update, nb_training_bc,t_inner_steps,n_value,
     tau=0.01, eval_env=None, param_noise_adaption_interval=50):
     rank = MPI.COMM_WORLD.Get_rank()
 
     assert (np.abs(env.action_space.low) == env.action_space.high).all()  # we assume symmetric actions.
     max_action = env.action_space.high
     logger.info('scaling actions by {} before executing in env'.format(max_action))
-    agent = DDPGFD(actor, critic, memory, env.observation_space.shape, env.action_space.shape, eps, eps_d, lambda_3, lambda_n=lambda_n, n_value=n_value,
-        gamma=gamma, tau=tau, normalize_returns=normalize_returns, normalize_observations=normalize_observations,
-        batch_size=batch_size, batch_size_bc=batch_size_bc, t_inner_steps=t_inner_steps, action_noise=action_noise, param_noise=param_noise, critic_l2_reg=critic_l2_reg,
-        actor_lr=actor_lr, critic_lr=critic_lr, enable_popart=popart, clip_norm=clip_norm,
-        reward_scale=reward_scale)
+    agent = DDPGFD(actor, critic, memory, env.observation_space.shape, env.action_space.shape, eps, eps_d,
+        lambda_3, lambda_n=lambda_n, n_value=n_value,gamma=gamma, tau=tau, normalize_returns=normalize_returns,
+        normalize_observations=normalize_observations,batch_size=batch_size, batch_size_bc=batch_size_bc,
+        t_inner_steps=t_inner_steps, action_noise=action_noise, param_noise=param_noise, critic_l2_reg=critic_l2_reg,
+        actor_lr=actor_lr, critic_lr=critic_lr, enable_popart=popart, clip_norm=clip_norm, reward_scale=reward_scale)
     logger.info('Using agent with the following configuration:')
     logger.info(str(agent.__dict__.items()))
 
@@ -125,9 +126,6 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                 epoch_critic_losses = []
                 epoch_adaptive_distances = []
 
-                # Initialize priority uniform
-                #agent.priority = 1/len(epoch_actions) ** np.ones(len(epoch_actions))
-
                 for t_train in range(nb_train_steps):
                     # Adapt param noise, if necessary.
                     if memory.nb_entries >= batch_size and t % param_noise_adaption_interval == 0:
@@ -209,5 +207,3 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                 if eval_env and hasattr(eval_env, 'get_state'):
                     with open(os.path.join(logdir, 'eval_env_state.pkl'), 'wb') as f:
                         pickle.dump(eval_env.get_state(), f)
-
-#def behaviour_cloning():

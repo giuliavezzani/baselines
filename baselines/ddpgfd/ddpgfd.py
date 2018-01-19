@@ -72,7 +72,6 @@ class DDPGFD(object):
         self.critic_target = tf.placeholder(tf.float32, shape=(None, 1), name='critic_target')
         self.critic_target_n = tf.placeholder(tf.float32, shape=(None, 1), name='critic_target_n')
         self.param_noise_stddev = tf.placeholder(tf.float32, shape=(), name='param_noise_stddev')
-
         self.priority_for_weights = tf.placeholder(tf.float32, shape=(None,1) , name='priority_for_weights')
 
         # Parameters.
@@ -106,7 +105,6 @@ class DDPGFD(object):
         self.t_inner_steps = t_inner_steps
         self.n_value = n_value
         self.lambda_n = lambda_n
-        #self.weights = np.ones(shape=(batch_size, 1))
 
         # Observation normalization.
         if self.normalize_observations:
@@ -139,25 +137,21 @@ class DDPGFD(object):
         # Create networks and core TF parts that are shared across setup parts.
         self.actor_tf = actor(normalized_obs0)
         self.normalized_critic_tf = critic(normalized_obs0, self.actions)
-        #self.normalized_critic_tf_1 = critic(normalized_obs1, self.actions, reuse=True)
         self.critic_tf = denormalize(tf.clip_by_value(self.normalized_critic_tf, self.return_range[0], self.return_range[1]), self.ret_rms)
         self.normalized_critic_with_actor_tf = critic(normalized_obs0, self.actor_tf, reuse=True)
         self.critic_with_actor_tf = denormalize(tf.clip_by_value(self.normalized_critic_with_actor_tf, self.return_range[0], self.return_range[1]), self.ret_rms)
         Q_obs1 = denormalize(target_critic(normalized_obs1, target_actor(normalized_obs1)), self.ret_rms)
         self.target_Q = self.rewards + (1. - self.terminals1) * gamma * Q_obs1
 
-
-
-        # Cretae n-step critic loss
+        # Cretae network for n-step critic loss
         Q_obsn = denormalize(target_critic(normalized_obsn, target_actor(normalized_obsn, reuse=True), reuse=True), self.ret_rms)
         self.target_Q_n = self.rewardsn + (1. - self.terminalsn) * gamma ** self.n_value * Q_obs1
 
         # Create core TF for computing priority
-        #self.TDerror = self.rewards + self.gamma * (self.normalized_critic_tf_1 - self.normalized_critic_tf)
         self.TDerror = self.normalized_critic_tf - tf.clip_by_value(normalize(tf.stop_gradient(self.target_Q), self.ret_rms), self.return_range[0], self.return_range[1])
         self.prior = tf.pow(self.TDerror, 2) + self.lambda_3 * tf.pow(tf.norm((tf.gradients(self.normalized_critic_tf, self.actions))), 2) + self.eps + self.eps_d
-
         self.weights = 1 / self.batch_size * np.divide(1, self.priority_for_weights)
+
         # Set up parts.
         if self.param_noise is not None:
             self.setup_param_noise(normalized_obs0)
@@ -194,15 +188,14 @@ class DDPGFD(object):
 
     def setup_actor_optimizer(self):
         logger.info('setting up actor optimizer')
-        # Weighted sm
+        # Weighted sum
         self.actor_loss = -tf.reduce_sum(np.multiply(self.critic_with_actor_tf, self.weights))
-        #self.actor_loss = -tf.reduce_mean(self.critic_with_actor_tf)
         # Adding regularization also for actor
         if self.actor_l2_reg > 0.:
             actor_reg_vars = [var for var in self.actor.trainable_vars if 'kernel' in var.name and 'output' not in var.name]
             for var in actor_reg_vars:
                 logger.info('  regularizing: {}'.format(var.name))
-            logger.info('  applying l2 regularization with {}'.format(self.critic_l2_reg))
+            logger.info('  applying l2 regularization with {}'.format(self.actor_l2_reg))
             actor_reg = tc.layers.apply_regularization(
                 tc.layers.l2_regularizer(self.actor_l2_reg),
                 weights_list=actor_reg_vars
@@ -228,7 +221,6 @@ class DDPGFD(object):
         logger.info('setting up critic optimizer')
         normalized_critic_target_tf = tf.clip_by_value(normalize(self.critic_target, self.ret_rms), self.return_range[0], self.return_range[1])
         self.critic_loss = tf.reduce_mean((np.multiply(tf.square(self.normalized_critic_tf - normalized_critic_target_tf), self.weights)))
-        #self.critic_loss = tf.reduce_mean(tf.square(self.normalized_critic_tf - normalized_critic_target_tf))
         if self.critic_l2_reg > 0.:
             critic_reg_vars = [var for var in self.critic.trainable_vars if 'kernel' in var.name and 'output' not in var.name]
             for var in critic_reg_vars:
@@ -240,7 +232,7 @@ class DDPGFD(object):
             )
             self.critic_loss += critic_reg
 
-        # N steo critic loss
+        # N-step critic loss
         normalized_critic_target_tf_n = tf.clip_by_value(normalize(self.critic_target_n, self.ret_rms), self.return_range[0], self.return_range[1])
         critic_loss_n = tf.reduce_mean((np.multiply(tf.square(self.normalized_critic_tf - normalized_critic_target_tf_n), self.weights)))
         self.critic_loss += self.lambda_n * critic_loss_n
@@ -326,26 +318,13 @@ class DDPGFD(object):
         return action, q
 
     def store_transition(self, obs0, action, reward, obs1, terminal1):
-        #import IPython
-        #IPython.embed()
         for i in range(len(reward)):
             reward[i] = reward[i] * self.reward_scale
 
-        #import IPython
-        #IPython.embed()
-        #obsn = list()
-        #rewardsn = list()
-        #terminalsn = list()
-
-        #for i in range(len(obs0)):
         obsn_single = list()
-        # np.zeros(shape=(len(obs0), obs0[0].shape[0]))
         termn_single = list()
-        #np.zeros(len(terminal1))
         rewn_single = list()
-        #np.zeros(len(reward))
-        #import IPython
-        #IPython.embed()
+
         for j in range(len(obs0)):
             rew = 0.
             if (j + self.n_value <=  len(obs0) - 1):
@@ -362,10 +341,6 @@ class DDPGFD(object):
                 rewn_single.append(rew)
                 termn_single.append(1.0)
 
-        #terminalsn.append(termn_single.astype('bool'))
-        #obsn.append(obsn_single)
-        #rewardsn.append(rewn_single)
-
         #import IPython
         #IPython.embed()
 
@@ -377,19 +352,16 @@ class DDPGFD(object):
 
     def train(self, num_iter):
         # Get a batch.
-        #batch = self.memory.sample(batch_size=self.batch_size)
-        #Sample with priorization
         print(num_iter)
         #import IPython
         #IPython.embed()
         if num_iter == 0:
+            # First time sample uniformly
             batch = self.memory.sample(batch_size=self.batch_size)
             #priority = np.ones(shape=(self.memory.observations0.length, ))
         else:
+            # Then, sample with priorization
            batch = self.memory.sample_with_priorization(batch_size=self.batch_size, priority=self.priority)
-
-        # Compute weights for loss (weighted loss)
-        #self.weights = ( 1 / self.batch_size * 1 / priority ) ** self.beta
 
         if self.normalize_returns and self.enable_popart:
             old_mean, old_std, target_Q,target_Q_n = self.sess.run([self.ret_rms.mean, self.ret_rms.std, self.target_Q, self.target_Q_n], feed_dict={
@@ -455,12 +427,6 @@ class DDPGFD(object):
                 self.actor_optimizer.update(actor_grads, stepsize=self.actor_lr)
                 self.critic_optimizer.update(critic_grads, stepsize=self.critic_lr)
 
-        #TDerror = batch['rewards'] + self.gamma * (self.normalized_critic_tf_1 - self.normalized_critic_tf)
-        #prior = TDerror + self.lambda_3 * (tf.gradients(self.normalized_critic_tf)) ** 2 + self.eps + self.eps_d
-
-
-        #batch_size = batch['obs1'].shape[0]
-        #priority = 1/batch_size ** np.ones(batch_size)
         self.priority = self.sess.run(self.prior, feed_dict={
             self.actions: self.memory.actions.get_batch(np.arange(len(self.memory.actions))),
             self.obs0: self.memory.observations0.get_batch(np.arange(len(self.memory.actions))),
@@ -469,11 +435,10 @@ class DDPGFD(object):
             self.terminals1: self.memory.terminals1.get_batch(np.arange(len(self.memory.terminals1))).reshape(len(self.memory.terminals1),1).astype('float32')
         })
 
-        #print('priority sum', np.sum(self.priority))
         return critic_loss, actor_loss
 
     def behaviour_cloning(self):
-
+        # Perform behaviour_cloning at the beginning with the demonstration collected before
         batch = self.memory.sample(batch_size=self.batch_size_bc)
 
         ops = [self.actor_grads_bc, self.actor_loss_bc]

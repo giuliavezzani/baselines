@@ -27,8 +27,7 @@ class DemoRingBuffer(object):
             self.length += 1
         elif self.length == self.maxlen:
             # No space, "remove" the (nb-min-demo + 1)-th element
-            # since we need to preserve at least nb-min-demo elements
-            # from the original demonstrations
+            # and replace with the new one
             for i in arange(0, self.nb_min_demo):
                 self.data[i + 1] = self.data[i]
             self.start = (self.start + 1) % self.maxlen
@@ -93,10 +92,7 @@ class Memory(object):
         # Draw such that we always have a proceeding element.
 
         priority_alpha = priority ** self.alpha
-        #print(priority_alpha[:,0])
         priority_alpha = priority_alpha / np.sum(priority_alpha)
-        #print(priority_alpha[:,0])
-        #self.batch_idxs = np.random.choice(self.nb_entries, size=batch_size, p=priority_alpha[:,0])
         self.batch_idxs = np.random.choice(self.nb_entries, size=batch_size, p=priority_alpha[:,0])
 
         obs0_batch = self.observations0.get_batch(self.batch_idxs)
