@@ -17,7 +17,6 @@ def plot(file_path, **kwargs):
     for key in sorted(data.keys()):
         x = np.arange(0,len(data[key]))
         y = data[key]
-        print(count)
         c = color[count - 1]
         plt.subplot(5,6, count)
         plt.xlabel('Epochs ', fontsize=8)
