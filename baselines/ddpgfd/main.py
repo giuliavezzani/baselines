@@ -28,7 +28,7 @@ class Demo():
         self.rewardsn = rewardsn
         self.termsn = termsn
 
-def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo, alpha, eps, eps_d, target_period_update, lambda_3, nb_training_bc,t_inner_steps,n_value,gamma, **kwargs):
+def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo, alpha, eps, eps_d, target_period_update, lambda_3, nb_training_bc,t_inner_steps,n_value,gamma,lambda_n,  **kwargs):
     # Configure things.
     rank = MPI.COMM_WORLD.Get_rank()
     if rank != 0:
@@ -90,7 +90,7 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo
         start_time = time.time()
     training.train(env=env, eval_env=eval_env, param_noise=param_noise, n_value= n_value,
         action_noise=action_noise, actor=actor, critic=critic, memory=memory, gamma=gamma,
-        eps=eps, eps_d=eps_d, lambda_3=lambda_3, target_period_update=target_period_update, nb_training_bc=nb_training_bc,t_inner_steps=t_inner_steps, **kwargs)
+        eps=eps, eps_d=eps_d, lambda_3=lambda_3,lambda_n=lambda_n,  target_period_update=target_period_update, nb_training_bc=nb_training_bc,t_inner_steps=t_inner_steps, **kwargs)
     env.close()
     if eval_env is not None:
         eval_env.close()
@@ -112,7 +112,7 @@ def read_demo_file(demo_file, n_value, gamma):
     print(demo_dict[0]['s0'].shape)
     print(demo_dict[0]['r'].shape)
 
-    for i in range(len(demo_dict)):
+    for i in range(0,len(demo_dict) - 1):
         obs0.append( demo_dict[i]['s0'] )
         obs1.append( demo_dict[i]['s1'] )
         acts.append( demo_dict[i]['a'] )
@@ -121,18 +121,20 @@ def read_demo_file(demo_file, n_value, gamma):
         obsn_single = np.zeros(shape=demo_dict[i]['s0'].shape)
         termn_single = np.zeros(shape=demo_dict[i]['t'].shape)
         rewn_single = np.zeros(shape=demo_dict[i]['r'].shape)
-        for j in range(len(demo_dict[i]['s0'])):
+        for j in range(0,len(demo_dict[i]['s0'])):
             if (j + n_value <=  len(demo_dict[i]['s0']) - 1):
                 obsn_single[j] = demo_dict[i]['s0'][j + n_value]
                 termn_single[j] = demo_dict[i]['t'][j + n_value].astype('float32')
-
-                for t in range(n_value - 1):
-                    rewn_single[t] += gamma ** (j + t) * demo_dict[i]['r'][j + t]
             else:
                 obsn_single[j] = demo_dict[i]['s0'][len(demo_dict[i]['s0']) - 1]
-                for t in range(len(demo_dict[i]['s0']) - j ):
+                for t in range(0,len(demo_dict[i]['s0']) - j):
                     termn_single[t + j]= 1.0
-                    rewn_single[t + j] += gamma ** (j) * demo_dict[i ]['r'][j + t]
+            rewn= 0.
+
+            for t in range(0,j):
+                 rewn +=  gamma ** (t) * demo_dict[i]['r'][t]
+            rewn_single[j] = rewn
+
 
         termsn.append(termn_single.astype('bool'))
         obsn.append(obsn_single)
@@ -189,6 +191,7 @@ def parse_args():
     parser.add_argument('--t-inner-steps', type=int, default=20)
     parser.add_argument('--n-value', type=int, default=20)
     boolean_flag(parser, 'evaluation', default=False)
+    parser.add_argument('--lambda-n', type=float, default=0.3) # weight for priorization computation
     args = parser.parse_args()
     # we don't directly specify timesteps for this script, so make sure that if we do specify them
     # they agree with the other parameters

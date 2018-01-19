@@ -15,14 +15,14 @@ from mpi4py import MPI
 
 def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, param_noise, actor, critic,
     normalize_returns, normalize_observations, critic_l2_reg, actor_lr, critic_lr, action_noise,
-    popart, gamma, clip_norm, nb_train_steps, nb_rollout_steps, nb_eval_steps, batch_size, batch_size_bc, memory, eps, eps_d, lambda_3, target_period_update, nb_training_bc,t_inner_steps,n_value,
+    popart, gamma, clip_norm, nb_train_steps, nb_rollout_steps, nb_eval_steps, batch_size, batch_size_bc, memory, eps, eps_d, lambda_3, lambda_n,  target_period_update, nb_training_bc,t_inner_steps,n_value,
     tau=0.01, eval_env=None, param_noise_adaption_interval=50):
     rank = MPI.COMM_WORLD.Get_rank()
 
     assert (np.abs(env.action_space.low) == env.action_space.high).all()  # we assume symmetric actions.
     max_action = env.action_space.high
     logger.info('scaling actions by {} before executing in env'.format(max_action))
-    agent = DDPGFD(actor, critic, memory, env.observation_space.shape, env.action_space.shape, eps, eps_d, lambda_3,n_value=n_value,
+    agent = DDPGFD(actor, critic, memory, env.observation_space.shape, env.action_space.shape, eps, eps_d, lambda_3, lambda_n=lambda_n, n_value=n_value,
         gamma=gamma, tau=tau, normalize_returns=normalize_returns, normalize_observations=normalize_observations,
         batch_size=batch_size, batch_size_bc=batch_size_bc, t_inner_steps=t_inner_steps, action_noise=action_noise, param_noise=param_noise, critic_l2_reg=critic_l2_reg,
         actor_lr=actor_lr, critic_lr=critic_lr, enable_popart=popart, clip_norm=clip_norm,
@@ -79,6 +79,8 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                 # Perform rollouts.
                 #for t_rollout in range(nb_rollout_steps):
                     # Predict next action.
+                #agent.reset()
+                #obs = env.reset()
                 while not done:
 
                     rollout_obs0.append(obs)
@@ -89,6 +91,7 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                     if rank == 0 and render and epoch/nb_epochs >= 0.8:
                         env.render()
                     assert max_action.shape == action.shape
+
                     new_obs, r, done, info = env.step(max_action * action)  # scale for execution in env (as far as DDPGfD is concerned, every action is in [-1, 1])
                     t += 1
                     if rank == 0 and render and epoch/nb_epochs >= 0.8:
@@ -115,9 +118,6 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                 episode_step = 0
                 epoch_episodes += 1
                 episodes += 1
-
-                agent.reset()
-                obs = env.reset()
 
                 # Train.
                 agent.store_transition(rollout_obs0, rollout_acts, rollout_rews, rollout_obs1, rollout_terms1)
@@ -166,6 +166,8 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
             combined_stats = {}
             for key in sorted(stats.keys()):
                 combined_stats[key] = mpi_mean(stats[key])
+            agent.reset()
+            obs = env.reset()
 
             # Rollout statistics.
             combined_stats['rollout/return'] = mpi_mean(epoch_episode_rewards)

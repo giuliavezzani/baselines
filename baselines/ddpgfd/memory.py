@@ -61,6 +61,9 @@ class Memory(object):
         self.terminalsn = DemoRingBuffer(limit, demonstrations.termsn, nb_min_demo)
         self.rewardsn = DemoRingBuffer(limit, demonstrations.rewardsn, nb_min_demo)
 
+        #import IPython
+        #IPython.embed()
+
     def sample(self, batch_size):
         # Draw such that we always have a proceeding element.
         batch_idxs = np.random.random_integers(self.nb_entries - 2, size=batch_size)

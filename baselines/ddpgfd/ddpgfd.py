@@ -55,7 +55,7 @@ def get_perturbed_actor_updates(actor, perturbed_actor, param_noise_stddev):
 
 
 class DDPGFD(object):
-    def __init__(self, actor, critic, memory, observation_shape, action_shape, eps, eps_d, lambda_3,batch_size_bc, t_inner_steps,n_value,  param_noise=None, action_noise=None,
+    def __init__(self, actor, critic, memory, observation_shape, action_shape, eps, eps_d, lambda_3,batch_size_bc, t_inner_steps,n_value, lambda_n,  param_noise=None, action_noise=None,
         gamma=0.99, tau=0.001, normalize_returns=False, enable_popart=False, normalize_observations=True,
         batch_size=128, observation_range=(-5., 5.), action_range=(-1., 1.), return_range=(-np.inf, np.inf),
         adaptive_param_noise=True, adaptive_param_noise_policy_threshold=.1,
@@ -105,6 +105,7 @@ class DDPGFD(object):
         self.critic = critic
         self.t_inner_steps = t_inner_steps
         self.n_value = n_value
+        self.lambda_n = lambda_n
         #self.weights = np.ones(shape=(batch_size, 1))
 
         # Observation normalization.
@@ -242,7 +243,7 @@ class DDPGFD(object):
         # N steo critic loss
         normalized_critic_target_tf_n = tf.clip_by_value(normalize(self.critic_target_n, self.ret_rms), self.return_range[0], self.return_range[1])
         critic_loss_n = tf.reduce_mean((np.multiply(tf.square(self.normalized_critic_tf - normalized_critic_target_tf_n), self.weights)))
-        self.critic_loss += critic_loss_n
+        self.critic_loss += self.lambda_n * critic_loss_n
         critic_shapes = [var.get_shape().as_list() for var in self.critic.trainable_vars]
         critic_nb_params = sum([reduce(lambda x, y: x * y, shape) for shape in critic_shapes])
         logger.info('  critic shapes: {}'.format(critic_shapes))
@@ -370,6 +371,7 @@ class DDPGFD(object):
 
         for i in range(len(obs0)):
             self.memory.append(obs0[0], obs1[0], obsn_single[0], action[0], reward[0],  terminal1[0], termn_single[0], rewn_single[0])
+
         if self.normalize_observations:
             self.obs_rms.update(np.array([obs0[0]]))
 
