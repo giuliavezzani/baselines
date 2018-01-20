@@ -71,7 +71,7 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, execution,model_name, 
     if rank == 0:
         start_time = time.time()
     if execution is False:
-        training.train(env=env, eval_env=eval_env, param_noise=param_noise,
+        training.train(env=env, eval_env=eval_env, param_noise=param_noise,model_name=model_name,
         action_noise=action_noise, actor=actor, critic=critic, memory=memory,env_id=env_id, **kwargs)
     else:
         training.execute(env=env, eval_env=eval_env, param_noise=param_noise,
