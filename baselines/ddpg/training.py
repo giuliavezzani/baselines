@@ -141,10 +141,10 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
             if np.mod(epoch, 2) == 0:
                 save_path = saver.save(sess, '/tmp/models/ddpg'+'-env-' + str(env_id) +'.ckpt', global_step=epoch)
                 print('Model saved in ', save_path)
-                variable0 = tf.trainable_variables()[0]
-                variable0_val = sess.run(variable0)
-                print(variable0.name)
-                np.save('test.npy', variable0_val)
+                #variable0 = tf.trainable_variables()[0]
+                #variable0_val = sess.run(variable0)
+                #print(variable0.name)
+                #np.save('test.npy', variable0_val)
 
 
 
@@ -224,11 +224,11 @@ def execute(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, 
         saver.restore(sess, model_name)
         sess.graph.finalize()
 
-        variable0 = tf.trainable_variables()[0]
-        variable0_val = sess.run(variable0)
-        print(variable0.name)
-        variable0_check = np.load('test.npy')
-        assert (np.allclose(variable0_val, variable0_check))
+        #variable0 = tf.trainable_variables()[0]
+        #variable0_val = sess.run(variable0)
+        #print(variable0.name)
+        #variable0_check = np.load('test.npy')
+        #assert (np.allclose(variable0_val, variable0_check))
 
         experts = []
 
