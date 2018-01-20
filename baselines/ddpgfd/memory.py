@@ -34,7 +34,7 @@ class DemoRingBuffer(object):
         else:
             # This should never happen.
             raise RuntimeError()
-        self.data[(self.start + self.length - 1) % self.maxlen] = v
+        self.data[(self.start + self.length + self.nb_min_demo - 1) % (self.maxlen - self.nb_min_demo)] = v
 
 
 def array_min2d(x):
@@ -44,13 +44,11 @@ def array_min2d(x):
     return x.reshape(-1, 1)
 
 class Memory(object):
-    def __init__(self, limit, action_shape, observation_shape, nb_min_demo, demonstrations, alpha):
+    def __init__(self, limit, action_shape, observation_shape, nb_min_demo, demonstrations):
         self.limit = limit
         # Minimum number of demonstration to be included in the buffer
         assert( nb_min_demo > 0 )
         self.nb_min_demo = nb_min_demo
-        assert( alpha > 0 )
-        self.alpha = alpha
 
         self.observations0 = DemoRingBuffer(limit,demonstrations.obs0, nb_min_demo, shape=observation_shape)
         self.actions = DemoRingBuffer(limit, demonstrations.acts,nb_min_demo,shape=action_shape)
@@ -92,9 +90,7 @@ class Memory(object):
     def sample_with_priorization(self, batch_size, priority):
         # Draw such that we always have a proceeding element.
 
-        priority_alpha = priority ** self.alpha
-        priority_alpha = priority_alpha / np.sum(priority_alpha)
-        self.batch_idxs = np.random.choice(self.nb_entries, size=batch_size, p=priority_alpha[:,0])
+        self.batch_idxs = np.random.choice(self.nb_entries, size=batch_size, p=priority[:,0])
 
         obs0_batch = self.observations0.get_batch(self.batch_idxs)
         obs1_batch = self.observations1.get_batch(self.batch_idxs)

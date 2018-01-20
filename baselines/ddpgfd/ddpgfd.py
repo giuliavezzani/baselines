@@ -55,7 +55,7 @@ def get_perturbed_actor_updates(actor, perturbed_actor, param_noise_stddev):
 
 
 class DDPGFD(object):
-    def __init__(self, actor, critic, memory, observation_shape, action_shape, eps, eps_d, lambda_3,batch_size_bc, t_inner_steps,n_value, lambda_n,  param_noise=None, action_noise=None,
+    def __init__(self, actor, critic, memory, observation_shape, action_shape, eps, eps_d, lambda_3,batch_size_bc, t_inner_steps,n_value, lambda_n,alpha,  param_noise=None, action_noise=None,
         gamma=0.99, tau=0.001, normalize_returns=False, enable_popart=False, normalize_observations=True,
         batch_size=128, observation_range=(-5., 5.), action_range=(-1., 1.), return_range=(-np.inf, np.inf),
         adaptive_param_noise=True, adaptive_param_noise_policy_threshold=.1,
@@ -105,6 +105,7 @@ class DDPGFD(object):
         self.t_inner_steps = t_inner_steps
         self.n_value = n_value
         self.lambda_n = lambda_n
+        self.alpha = alpha
 
         # Observation normalization.
         if self.normalize_observations:
@@ -145,12 +146,14 @@ class DDPGFD(object):
 
         # Cretae network for n-step critic loss
         Q_obsn = denormalize(target_critic(normalized_obsn, target_actor(normalized_obsn, reuse=True), reuse=True), self.ret_rms)
-        self.target_Q_n = self.rewardsn + (1. - self.terminalsn) * gamma ** self.n_value * Q_obs1
+        self.target_Q_n = self.rewardsn + (1. - self.terminalsn) * gamma ** self.n_value * Q_obsn
 
         # Create core TF for computing priority
         self.TDerror = self.normalized_critic_tf - tf.clip_by_value(normalize(tf.stop_gradient(self.target_Q), self.ret_rms), self.return_range[0], self.return_range[1])
-        self.prior = tf.pow(self.TDerror, 2) + self.lambda_3 * tf.pow(tf.norm((tf.gradients(self.normalized_critic_tf, self.actions))), 2) + self.eps + self.eps_d
-        self.weights = 1 / self.batch_size * np.divide(1, self.priority_for_weights)
+        prior_argument = tf.pow(self.TDerror, 2) + self.lambda_3 * tf.pow(tf.norm((tf.gradients(self.normalized_critic_tf, self.actions))), 2) + self.eps + self.eps_d
+        prior_num = tf.pow( prior_argument, self.alpha)
+        self.prior = np.divide(prior_num , U.sum(prior_num))
+        self.weights = tf.pow(1 / self.batch_size * np.divide(1, self.priority_for_weights), self.beta)
 
         # Set up parts.
         if self.param_noise is not None:
@@ -220,7 +223,7 @@ class DDPGFD(object):
     def setup_critic_optimizer(self):
         logger.info('setting up critic optimizer')
         normalized_critic_target_tf = tf.clip_by_value(normalize(self.critic_target, self.ret_rms), self.return_range[0], self.return_range[1])
-        self.critic_loss = tf.reduce_mean((np.multiply(tf.square(self.normalized_critic_tf - normalized_critic_target_tf), self.weights)))
+        self.critic_loss = tf.reduce_sum((np.multiply(tf.square(self.normalized_critic_tf - normalized_critic_target_tf), self.weights)))
         if self.critic_l2_reg > 0.:
             critic_reg_vars = [var for var in self.critic.trainable_vars if 'kernel' in var.name and 'output' not in var.name]
             for var in critic_reg_vars:
@@ -234,7 +237,7 @@ class DDPGFD(object):
 
         # N-step critic loss
         normalized_critic_target_tf_n = tf.clip_by_value(normalize(self.critic_target_n, self.ret_rms), self.return_range[0], self.return_range[1])
-        critic_loss_n = tf.reduce_mean((np.multiply(tf.square(self.normalized_critic_tf - normalized_critic_target_tf_n), self.weights)))
+        critic_loss_n = tf.reduce_sum((np.multiply(tf.square(self.normalized_critic_tf - normalized_critic_target_tf_n), self.weights)))
         self.critic_loss += self.lambda_n * critic_loss_n
         critic_shapes = [var.get_shape().as_list() for var in self.critic.trainable_vars]
         critic_nb_params = sum([reduce(lambda x, y: x * y, shape) for shape in critic_shapes])
@@ -329,15 +332,15 @@ class DDPGFD(object):
             rew = 0.
             if (j + self.n_value <=  len(obs0) - 1):
                 obsn_single.append(obs0[j + self.n_value])
-                termn_single.append( terminal1[j + self.n_value].astype('float32'))
+                termn_single.append( float(terminal1[j + self.n_value]))
 
-                for t in range(self.n_value - 1):
-                    rew += self.gamma ** (j + t) * reward[j + t]
-                rewn.append(rew)
+                for t in range(self.n_value):
+                    rew += self.gamma ** (t) * reward[j + t]
+                rewn_single.append(rew)
             else:
                 obsn_single.append(obs0[len(obs0) - 1])
-                for t in range(len(obs0) - j ):
-                    rew +=  self.gamma ** (j) * reward[j + t]
+                for t in range(j,len(obs0)):
+                    rew +=  self.gamma ** (t - j) * reward[t]
                 rewn_single.append(rew)
                 termn_single.append(1.0)
 
@@ -345,7 +348,7 @@ class DDPGFD(object):
         #IPython.embed()
 
         for i in range(len(obs0)):
-            self.memory.append(obs0[0], obs1[0], obsn_single[0], action[0], reward[0],  terminal1[0], termn_single[0], rewn_single[0])
+            self.memory.append(obs0[i], obs1[i], obsn_single[i], action[i], reward[i],  terminal1[i], termn_single[i], rewn_single[i])
 
         if self.normalize_observations:
             self.obs_rms.update(np.array([obs0[0]]))
@@ -373,8 +376,7 @@ class DDPGFD(object):
                 self.terminalsn: batch['terminalsn'].astype('float32'),
             })
             self.ret_rms.update(target_Q.flatten())
-            self.ret_rms.update(target_Q_n.flatten())
-            ### TODO
+
             self.sess.run(self.renormalize_Q_outputs_op, feed_dict={
                 self.old_std : np.array([old_std]),
                 self.old_mean : np.array([old_mean]),
@@ -409,7 +411,7 @@ class DDPGFD(object):
                     self.actions: batch['actions'],
                     self.critic_target: target_Q,
                     self.critic_target_n: target_Q_n,
-                    self.priority_for_weights: np.ones(shape= batch['rewards'].shape)
+                    self.priority_for_weights:  np.full(batch['rewards'].shape, 1/self.batch_size, dtype='float32')
                 })
 
                 self.actor_optimizer.update(actor_grads, stepsize=self.actor_lr)
@@ -434,6 +436,7 @@ class DDPGFD(object):
             self.rewards: self.memory.rewards.get_batch(np.arange(len(self.memory.actions))).reshape(len(self.memory.actions),1),
             self.terminals1: self.memory.terminals1.get_batch(np.arange(len(self.memory.terminals1))).reshape(len(self.memory.terminals1),1).astype('float32')
         })
+
 
         return critic_loss, actor_loss
 

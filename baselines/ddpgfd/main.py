@@ -28,7 +28,7 @@ class Demo():
         self.rewardsn = rewardsn
         self.termsn = termsn
 
-def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo, alpha, eps, eps_d, target_period_update, lambda_3, nb_training_bc,t_inner_steps,n_value,gamma,lambda_n,  **kwargs):
+def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file,  alpha, eps, eps_d, target_period_update, lambda_3, nb_training_bc,t_inner_steps,n_value,gamma,lambda_n,  **kwargs):
     # Configure things.
     rank = MPI.COMM_WORLD.Get_rank()
     if rank != 0:
@@ -72,7 +72,7 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo
     demonstrations = read_demo_file(demo_file, n_value, gamma)
     nb_min_demo = len(demonstrations.obs0)
 
-    memory = Memory(limit=int(1e6), action_shape=env.action_space.shape, observation_shape=env.observation_space.shape, nb_min_demo=nb_min_demo, demonstrations=demonstrations, alpha=alpha)
+    memory = Memory(limit=int(1e6), action_shape=env.action_space.shape, observation_shape=env.observation_space.shape, nb_min_demo=nb_min_demo, demonstrations=demonstrations)
     critic = Critic(layer_norm=layer_norm)
     actor = Actor(nb_actions, layer_norm=layer_norm)
 
@@ -90,7 +90,7 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file, nb_min_demo
         start_time = time.time()
     training.train(env=env, eval_env=eval_env, param_noise=param_noise, n_value= n_value,
         action_noise=action_noise, actor=actor, critic=critic, memory=memory, gamma=gamma,
-        eps=eps, eps_d=eps_d, lambda_3=lambda_3,lambda_n=lambda_n,  target_period_update=target_period_update, nb_training_bc=nb_training_bc,t_inner_steps=t_inner_steps, **kwargs)
+        eps=eps, eps_d=eps_d, lambda_3=lambda_3,lambda_n=lambda_n, alpha=alpha, target_period_update=target_period_update, nb_training_bc=nb_training_bc,t_inner_steps=t_inner_steps, **kwargs)
     env.close()
     if eval_env is not None:
         eval_env.close()
@@ -125,14 +125,17 @@ def read_demo_file(demo_file, n_value, gamma):
             if (j + n_value <=  len(demo_dict[i]['s0']) - 1):
                 obsn_single[j] = demo_dict[i]['s0'][j + n_value]
                 termn_single[j] = demo_dict[i]['t'][j + n_value].astype('float32')
+                rewn= 0.
+                for t in range(j, j + n_value):
+                     rewn +=  gamma ** (t - j) * demo_dict[i]['r'][t]
             else:
                 obsn_single[j] = demo_dict[i]['s0'][len(demo_dict[i]['s0']) - 1]
-                for t in range(0,len(demo_dict[i]['s0']) - j):
-                    termn_single[t + j]= 1.0
-            rewn= 0.
+                termn_single[len(demo_dict[i]['s0']) - 1]= 1.0
+                rewn= 0.
+                termn_single[j]= 1.0
+                for t in range(j, len(demo_dict[i]['s0'])):
+                     rewn +=  gamma ** (t - j) * demo_dict[i]['r'][t]
 
-            for t in range(0,j):
-                 rewn +=  gamma ** (t) * demo_dict[i]['r'][t]
             rewn_single[j] = rewn
 
 
@@ -180,7 +183,6 @@ def parse_args():
     parser.add_argument('--nb-rollout-steps', type=int, default=100)  # per epoch cycle and MPI worker
     parser.add_argument('--noise-type', type=str, default='adaptive-param_0.2')  # choices are adaptive-param_xx, ou_xx, normal_xx, none
     parser.add_argument('--num-timesteps', type=int, default=None)
-    parser.add_argument('--nb-min-demo', type=int, default=10) # minimum number of demo guaranteed in the replay buffer
     parser.add_argument('--demo-file', type=str, default='demo-collected-2.npy') # minimum number of demo guaranteed in the replay buffer
     parser.add_argument('--alpha', type=float, default=0.3) # alpha value for priorization
     parser.add_argument('--eps', type=float, default=0.3) # constant for priorization computation
