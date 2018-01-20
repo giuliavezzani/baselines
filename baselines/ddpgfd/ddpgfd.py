@@ -355,8 +355,8 @@ class DDPGFD(object):
 
     def train(self, num_iter):
         # Get a batch.
-        print(num_iter)
-        #import IPython
+        print('                     num training iter ', num_iter)
+        #import IPython:
         #IPython.embed()
         if num_iter == 0:
             # First time sample uniformly

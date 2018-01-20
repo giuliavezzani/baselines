@@ -80,7 +80,13 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                 # Collect more rollouts
                 for t_rollout in range(nb_rollout_steps):
                     # Predict next action.
-                    #print(t_rollout)
+
+                    print('num rollout collected: ', t_rollout)
+
+                    if done:
+                        obs = env.reset()
+                        agent.reset()
+                        done = False
                     while not done:
 
                         rollout_obs0.append(obs)
@@ -109,12 +115,6 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
 
                         obs = new_obs
 
-                        #if done:
-                            # Episode done.
-                    print(done)
-                    #if done:
-                        #agent.reset()
-                        #obs = env.reset()
                     epoch_episode_rewards.append(episode_reward)
                     episode_rewards_history.append(episode_reward)
                     epoch_episode_steps.append(episode_step)
