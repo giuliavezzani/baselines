@@ -196,7 +196,7 @@ class DDPGFD(object):
     def setup_actor_optimizer(self):
         logger.info('setting up actor optimizer')
         # Weighted sum
-        self.actor_loss = -tf.reduce_sum(np.multiply(self.critic_with_actor_tf, self.weights))
+        self.actor_loss = -tf.reduce_mean(np.multiply(self.critic_with_actor_tf, self.weights))
         # Adding regularization also for actor
         if self.actor_l2_reg > 0.:
             actor_reg_vars = [var for var in self.actor.trainable_vars if 'kernel' in var.name and 'output' not in var.name]
@@ -228,7 +228,7 @@ class DDPGFD(object):
 
         logger.info('setting up critic optimizer')
         normalized_critic_target_tf = tf.clip_by_value(normalize(self.critic_target, self.ret_rms), self.return_range[0], self.return_range[1])
-        self.critic_loss = tf.reduce_sum((np.multiply(tf.square(self.normalized_critic_tf - normalized_critic_target_tf), self.weights)))
+        self.critic_loss = tf.reduce_mean((np.multiply(tf.square(self.normalized_critic_tf - normalized_critic_target_tf), self.weights)))
         if self.critic_l2_reg > 0.:
             critic_reg_vars = [var for var in self.critic.trainable_vars if 'kernel' in var.name and 'output' not in var.name]
             for var in critic_reg_vars:
@@ -244,7 +244,7 @@ class DDPGFD(object):
         if not self.nstep_loss_off:
             print('nstep loss')
             normalized_critic_target_tf_n = tf.clip_by_value(normalize(self.critic_target_n, self.ret_rms), self.return_range[0], self.return_range[1])
-            critic_loss_n = tf.reduce_sum((np.multiply(tf.square(self.normalized_critic_tf - normalized_critic_target_tf_n), self.weights)))
+            critic_loss_n = tf.reduce_mean((np.multiply(tf.square(self.normalized_critic_tf - normalized_critic_target_tf_n), self.weights)))
             self.critic_loss += self.lambda_n * critic_loss_n
         critic_shapes = [var.get_shape().as_list() for var in self.critic.trainable_vars]
         critic_nb_params = sum([reduce(lambda x, y: x * y, shape) for shape in critic_shapes])
