@@ -28,7 +28,7 @@ class Demo():
         self.rewardsn = rewardsn
         self.termsn = termsn
 
-def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file,  alpha, eps, eps_d, target_period_update, lambda_3, nb_training_bc,t_inner_steps,n_value,gamma,lambda_n,  **kwargs):
+def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file,  alpha, eps, eps_d, target_period_update, lambda_3, nb_training_bc,t_inner_steps,n_value,gamma,lambda_n, behaviour_cloning_off, priorization_off, nstep_loss_off, **kwargs):
     # Configure things.
     rank = MPI.COMM_WORLD.Get_rank()
     if rank != 0:
@@ -89,7 +89,7 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file,  alpha, eps
     if rank == 0:
         start_time = time.time()
     training.train(env=env, eval_env=eval_env, param_noise=param_noise, n_value= n_value,
-        action_noise=action_noise, actor=actor, critic=critic, memory=memory, gamma=gamma,
+        action_noise=action_noise, actor=actor, critic=critic, memory=memory, gamma=gamma, behaviour_cloning_off=behaviour_cloning_off, priorization_off=priorization_off, nstep_loss_off=nstep_loss_off,
         eps=eps, eps_d=eps_d, lambda_3=lambda_3,lambda_n=lambda_n, alpha=alpha, target_period_update=target_period_update, nb_training_bc=nb_training_bc,t_inner_steps=t_inner_steps, **kwargs)
     env.close()
     if eval_env is not None:
@@ -194,6 +194,9 @@ def parse_args():
     parser.add_argument('--n-value', type=int, default=20)
     boolean_flag(parser, 'evaluation', default=False)
     parser.add_argument('--lambda-n', type=float, default=0.3) # weight for priorization computation
+    boolean_flag(parser, 'behaviour-cloning-off', default=False)
+    boolean_flag(parser, 'priorization-off', default=False)
+    boolean_flag(parser, 'nstep-loss-off', default=False)
     args = parser.parse_args()
     # we don't directly specify timesteps for this script, so make sure that if we do specify them
     # they agree with the other parameters

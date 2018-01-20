@@ -55,7 +55,7 @@ def get_perturbed_actor_updates(actor, perturbed_actor, param_noise_stddev):
 
 
 class DDPGFD(object):
-    def __init__(self, actor, critic, memory, observation_shape, action_shape, eps, eps_d, lambda_3,batch_size_bc, t_inner_steps,n_value, lambda_n,alpha,  param_noise=None, action_noise=None,
+    def __init__(self, actor, critic, memory, observation_shape, action_shape, eps, eps_d, lambda_3,batch_size_bc, t_inner_steps,n_value, lambda_n,alpha, priorization_off,nstep_loss_off,  param_noise=None, action_noise=None,
         gamma=0.99, tau=0.001, normalize_returns=False, enable_popart=False, normalize_observations=True,
         batch_size=128, observation_range=(-5., 5.), action_range=(-1., 1.), return_range=(-np.inf, np.inf),
         adaptive_param_noise=True, adaptive_param_noise_policy_threshold=.1,
@@ -106,6 +106,10 @@ class DDPGFD(object):
         self.n_value = n_value
         self.lambda_n = lambda_n
         self.alpha = alpha
+
+        # Testing flafs
+        self.priorization_off = priorization_off
+        self.nstep_loss_off = nstep_loss_off
 
         # Observation normalization.
         if self.normalize_observations:
@@ -221,6 +225,7 @@ class DDPGFD(object):
             beta1=0.9, beta2=0.999, epsilon=1e-08)
 
     def setup_critic_optimizer(self):
+
         logger.info('setting up critic optimizer')
         normalized_critic_target_tf = tf.clip_by_value(normalize(self.critic_target, self.ret_rms), self.return_range[0], self.return_range[1])
         self.critic_loss = tf.reduce_sum((np.multiply(tf.square(self.normalized_critic_tf - normalized_critic_target_tf), self.weights)))
@@ -236,9 +241,11 @@ class DDPGFD(object):
             self.critic_loss += critic_reg
 
         # N-step critic loss
-        normalized_critic_target_tf_n = tf.clip_by_value(normalize(self.critic_target_n, self.ret_rms), self.return_range[0], self.return_range[1])
-        critic_loss_n = tf.reduce_sum((np.multiply(tf.square(self.normalized_critic_tf - normalized_critic_target_tf_n), self.weights)))
-        self.critic_loss += self.lambda_n * critic_loss_n
+        if not self.nstep_loss_off:
+            print('nstep loss')
+            normalized_critic_target_tf_n = tf.clip_by_value(normalize(self.critic_target_n, self.ret_rms), self.return_range[0], self.return_range[1])
+            critic_loss_n = tf.reduce_sum((np.multiply(tf.square(self.normalized_critic_tf - normalized_critic_target_tf_n), self.weights)))
+            self.critic_loss += self.lambda_n * critic_loss_n
         critic_shapes = [var.get_shape().as_list() for var in self.critic.trainable_vars]
         critic_nb_params = sum([reduce(lambda x, y: x * y, shape) for shape in critic_shapes])
         logger.info('  critic shapes: {}'.format(critic_shapes))
@@ -358,11 +365,11 @@ class DDPGFD(object):
         print('                     num training iter ', num_iter)
         #import IPython:
         #IPython.embed()
-        if num_iter == 0:
+        if num_iter == 0 or self.priorization_off:
             # First time sample uniformly
             batch = self.memory.sample(batch_size=self.batch_size)
             #priority = np.ones(shape=(self.memory.observations0.length, ))
-        else:
+        elif not self.priorization_off:
             # Then, sample with priorization
            batch = self.memory.sample_with_priorization(batch_size=self.batch_size, priority=self.priority)
 
@@ -404,7 +411,7 @@ class DDPGFD(object):
         # Multiple learning steps
         for t_learn in np.arange(self.t_inner_steps):
             # Get all gradients and perform a synced update.
-            if num_iter == 0:
+            if num_iter == 0 or self.priorization_off:
                 ops = [self.actor_grads, self.actor_loss, self.critic_grads, self.critic_loss]
                 actor_grads, actor_loss, critic_grads, critic_loss = self.sess.run(ops, feed_dict={
                     self.obs0: batch['obs0'],
@@ -416,7 +423,7 @@ class DDPGFD(object):
 
                 self.actor_optimizer.update(actor_grads, stepsize=self.actor_lr)
                 self.critic_optimizer.update(critic_grads, stepsize=self.critic_lr)
-            else:
+            elif not self.priorization_off:
                 ops = [self.actor_grads, self.actor_loss, self.critic_grads, self.critic_loss]
                 actor_grads, actor_loss, critic_grads, critic_loss = self.sess.run(ops, feed_dict={
                     self.obs0: batch['obs0'],
@@ -429,13 +436,14 @@ class DDPGFD(object):
                 self.actor_optimizer.update(actor_grads, stepsize=self.actor_lr)
                 self.critic_optimizer.update(critic_grads, stepsize=self.critic_lr)
 
-        self.priority = self.sess.run(self.prior, feed_dict={
-            self.actions: self.memory.actions.get_batch(np.arange(len(self.memory.actions))),
-            self.obs0: self.memory.observations0.get_batch(np.arange(len(self.memory.actions))),
-            self.obs1: self.memory.observations1.get_batch(np.arange(len(self.memory.actions))),
-            self.rewards: self.memory.rewards.get_batch(np.arange(len(self.memory.actions))).reshape(len(self.memory.actions),1),
-            self.terminals1: self.memory.terminals1.get_batch(np.arange(len(self.memory.terminals1))).reshape(len(self.memory.terminals1),1).astype('float32')
-        })
+            if not self.priorization_off:
+                self.priority = self.sess.run(self.prior, feed_dict={
+                    self.actions: self.memory.actions.get_batch(np.arange(len(self.memory.actions))),
+                    self.obs0: self.memory.observations0.get_batch(np.arange(len(self.memory.actions))),
+                    self.obs1: self.memory.observations1.get_batch(np.arange(len(self.memory.actions))),
+                    self.rewards: self.memory.rewards.get_batch(np.arange(len(self.memory.actions))).reshape(len(self.memory.actions),1),
+                    self.terminals1: self.memory.terminals1.get_batch(np.arange(len(self.memory.terminals1))).reshape(len(self.memory.terminals1),1).astype('float32')
+                })
 
 
         return critic_loss, actor_loss
