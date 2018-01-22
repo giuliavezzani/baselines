@@ -44,14 +44,14 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
         # Prepare everything.
         agent.initialize(sess)
 
-        vals = pickle.load(open('demo-collected-manually.pkl', 'rb'))
-        var = tf.trainable_variables()
-        for v in var:
-            assign_op = v.assign(vals[v.name])
-            sess.run(assign_op)
+        #vals = pickle.load(open('demo-collected-manually.pkl', 'rb'))
+        #var = tf.trainable_variables()
+        #for v in var:
+        #    assign_op = v.assign(vals[v.name])
+        #    sess.run(assign_op)
 
-        #agent.initialize(sess)
-        agent.sess = sess
+        agent.initialize(sess)
+        #agent.sess = sess
 
         #aver = tf.train.Saver()
         #saver.restore(sess, model_name)
