@@ -82,6 +82,7 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                 # Collect more rollouts
                 for t_rollout in range(nb_rollout_steps):
                     # Predict next action.
+                    print('num roll', t_rollout)
 
                     #print('num rollout collected: ', t_rollout)
 
@@ -132,6 +133,7 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                 epoch_adaptive_distances = []
 
                 for t_train in range(nb_train_steps):
+                    print('num train',t_train)
                     # Adapt param noise, if necessary.
                     if memory.nb_entries >= batch_size and t % param_noise_adaption_interval == 0:
                         distance = agent.adapt_param_noise()
