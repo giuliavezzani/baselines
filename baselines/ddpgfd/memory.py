@@ -50,6 +50,7 @@ class Memory(object):
         assert( nb_min_demo > 0 )
         self.nb_min_demo = nb_min_demo
 
+
         self.observations0 = DemoRingBuffer(limit,demonstrations.obs0, nb_min_demo, shape=observation_shape)
         self.actions = DemoRingBuffer(limit, demonstrations.acts,nb_min_demo,shape=action_shape)
         self.rewards = DemoRingBuffer(limit, demonstrations.rewards,nb_min_demo ,shape=(1,))
@@ -65,6 +66,7 @@ class Memory(object):
     def sample(self, batch_size):
         # Draw such that we always have a proceeding element.
         batch_idxs = np.random.random_integers(self.nb_entries - 2, size=batch_size)
+        self.batch_idxs = batch_idxs
 
         obs0_batch = self.observations0.get_batch(batch_idxs)
         obs1_batch = self.observations1.get_batch(batch_idxs)
@@ -90,9 +92,13 @@ class Memory(object):
     def sample_with_priorization(self, batch_size, priority):
         # Draw such that we always have a proceeding element.
 
+        print(priority)
         priority[:,0] = priority[:,0]/  np.sum(priority[:,0])
+        #priority= priority/  np.sum(priority)
         print('in memory', np.sum(priority[:,0]))
+
         self.batch_idxs = np.random.choice(self.nb_entries, size=batch_size, p=priority[:,0])
+        #self.batch_idxs = np.random.choice(self.nb_entries, size=batch_size, p=priority)
 
         obs0_batch = self.observations0.get_batch(self.batch_idxs)
         obs1_batch = self.observations1.get_batch(self.batch_idxs)

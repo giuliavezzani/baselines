@@ -1,6 +1,7 @@
 from copy import copy
 from functools import reduce
 
+import time
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib as tc
@@ -73,6 +74,8 @@ class DDPGFD(object):
         self.critic_target_n = tf.placeholder(tf.float32, shape=(None, 1), name='critic_target_n')
         self.param_noise_stddev = tf.placeholder(tf.float32, shape=(), name='param_noise_stddev')
         self.priority_for_weights = tf.placeholder(tf.float32, shape=(None,1) , name='priority_for_weights')
+
+        #self.priority =  np.zeros((int(1e6),) + (1,)).astype('float32')
 
         # Parameters.
         self.gamma = gamma
@@ -153,6 +156,7 @@ class DDPGFD(object):
         self.target_Q_n = self.rewardsn + (1. - self.terminalsn) * gamma ** self.n_value * Q_obsn
 
         # Create core TF for computing priority
+
         self.TDerror = self.normalized_critic_tf - tf.clip_by_value(normalize(tf.stop_gradient(self.target_Q), self.ret_rms), self.return_range[0], self.return_range[1])
         prior_argument = tf.pow(self.TDerror, 2) + self.lambda_3 * tf.pow(tf.norm((tf.gradients(self.normalized_critic_tf, self.actions))), 2) + self.eps + self.eps_d
         prior_num = tf.pow( prior_argument, self.alpha)
@@ -371,8 +375,11 @@ class DDPGFD(object):
             #priority = np.ones(shape=(self.memory.observations0.length, ))
         elif not self.priorization_off:
             # Then, sample with priorization
+           #start_time = time.time()
            batch = self.memory.sample_with_priorization(batch_size=self.batch_size, priority=self.priority)
+           #print(' Time for sampling with prior ', time.time() - start_time)
 
+        #start_time = time.time()
         if self.normalize_returns and self.enable_popart:
             old_mean, old_std, target_Q,target_Q_n = self.sess.run([self.ret_rms.mean, self.ret_rms.std, self.target_Q, self.target_Q_n], feed_dict={
                 self.obs1: batch['obs1'],
@@ -388,6 +395,7 @@ class DDPGFD(object):
                 self.old_std : np.array([old_std]),
                 self.old_mean : np.array([old_mean]),
             })
+            #print(' Time for normalized Q', time.time() - start_time)
 
             # Run sanity check. Disabled by default since it slows down things considerably.
             # print('running sanity check')
@@ -407,9 +415,11 @@ class DDPGFD(object):
                 self.rewardsn: batch['rewardsn'],
                 self.terminalsn: batch['terminalsn'].astype('float32'),
             })
+            #print(' Time for unnormalized Q', time.time() - start_time)
 
         # Multiple learning steps
         for t_learn in np.arange(self.t_inner_steps):
+            #start_time = time.time()
             # Get all gradients and perform a synced update.
             if num_iter == 0 or self.priorization_off:
                 ops = [self.actor_grads, self.actor_loss, self.critic_grads, self.critic_loss]
@@ -436,14 +446,32 @@ class DDPGFD(object):
                 self.actor_optimizer.update(actor_grads, stepsize=self.actor_lr)
                 self.critic_optimizer.update(critic_grads, stepsize=self.critic_lr)
 
+            #print(' Time optimizers updates', time.time() - start_time)
+
+            #start_time = time.time()
+            #if not self.priorization_off:
+            #    self.priority = self.sess.run(self.prior, feed_dict={
+            #        self.actions: self.memory.actions.get_batch(np.arange(len(self.memory.actions))),
+            #        self.obs0: self.memory.observations0.get_batch(np.arange(len(self.memory.actions))),
+            #        self.obs1: self.memory.observations1.get_batch(np.arange(len(self.memory.actions))),
+            #        self.rewards: self.memory.rewards.get_batch(np.arange(len(self.memory.actions))).reshape(len(self.memory.actions),1),
+            #        self.terminals1: self.memory.terminals1.get_batch(np.arange(len(self.memory.terminals1))).reshape(len(self.memory.terminals1),1).astype('float32')
+            #    })
             if not self.priorization_off:
-                self.priority = self.sess.run(self.prior, feed_dict={
-                    self.actions: self.memory.actions.get_batch(np.arange(len(self.memory.actions))),
-                    self.obs0: self.memory.observations0.get_batch(np.arange(len(self.memory.actions))),
-                    self.obs1: self.memory.observations1.get_batch(np.arange(len(self.memory.actions))),
-                    self.rewards: self.memory.rewards.get_batch(np.arange(len(self.memory.actions))).reshape(len(self.memory.actions),1),
-                    self.terminals1: self.memory.terminals1.get_batch(np.arange(len(self.memory.terminals1))).reshape(len(self.memory.terminals1),1).astype('float32')
+                self.priority_minibatch = self.sess.run(self.prior, feed_dict={
+                    self.actions: batch['actions'],
+                    self.obs0: batch['obs0'],
+                    self.obs1: batch['obs1'],
+                    self.rewards: batch['rewards'],
+                    self.terminals1: batch['terminals1']
                 })
+                self.priority = np.full((len(self.memory.actions), 1), 1.0, dtype='float32')
+                for idx, priority in zip(self.memory.batch_idxs, self.priority_minibatch):
+                    self.priority[idx] = priority
+
+            #print(' Priority computation', time.time() - start_time)
+
+            #print('buffer dim', len(self.memory.actions))
 
 
         return critic_loss, actor_loss
