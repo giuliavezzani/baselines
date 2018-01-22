@@ -44,6 +44,15 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
         # Prepare everything.
         agent.initialize(sess)
 
+        vals = pickle.load(open('demo-collected-manually.pkl', 'rb'))
+        var = tf.trainable_variables()
+        for v in var:
+            assign_op = v.assign(vals[v.name])
+            sess.run(assign_op)
+
+        #agent.initialize(sess)
+        agent.sess = sess
+
         #aver = tf.train.Saver()
         #saver.restore(sess, model_name)
         sess.graph.finalize()
@@ -95,6 +104,7 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                     obs = new_obs
 
                     if done:
+                        print('return ', episode_reward)
                         # Episode done.
                         epoch_episode_rewards.append(episode_reward)
                         episode_rewards_history.append(episode_reward)
@@ -225,15 +235,33 @@ def execute(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, 
     with U.single_threaded_session() as sess:
         # Prepare everything.
         agent.initialize(sess)
-        saver = tf.train.Saver()
-        saver.restore(sess, model_name)
-        sess.graph.finalize()
+        #saver = tf.train.Saver()
+        #saver.restore(sess, model_name)
+
 
         #variable0 = tf.trainable_variables()[0]
         #variable0_val = sess.run(variable0)
         #print(variable0.name)
         #variable0_check = np.load('test.npy')
         #assert (np.allclose(variable0_val, variable0_check))
+        ## Manualy collect variables:
+        vals = pickle.load(open('demo-collected-manually.pkl', 'rb'))
+        var = tf.trainable_variables()
+        for v in var:
+            assign_op = v.assign(vals[v.name])
+            sess.run(assign_op)
+
+
+
+
+        #agent.initialize(sess)
+        agent.sess = sess
+        import IPython
+        IPython.embed()
+
+
+        #sess.graph.finalize()
+
 
         experts = []
 
@@ -257,7 +285,7 @@ def execute(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, 
                 env.render()
                 #action = act(obs[None, :])
                 observations0.append(obs)
-                action, q = agent.pi(obs)
+                action, q = agent.pi(obs, apply_noise=False)
 
                 assert max_action.shape == action.shape
                 new_obs, r, done, info = env.step(max_action * action)
@@ -265,6 +293,10 @@ def execute(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, 
                 observations1.append(obs)
                 terminals.append(done)
                 rewards.append(r)
+
+                obs = new_obs
+
+            print('reward', np.sum(np.asarray(rewards)))
 
             expert_data = {'s0': np.array(observations0),
                            's1': np.array(observations1),
