@@ -235,15 +235,7 @@ def execute(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, 
     with U.single_threaded_session() as sess:
         # Prepare everything.
         agent.initialize(sess)
-        #saver = tf.train.Saver()
-        #saver.restore(sess, model_name)
 
-
-        #variable0 = tf.trainable_variables()[0]
-        #variable0_val = sess.run(variable0)
-        #print(variable0.name)
-        #variable0_check = np.load('test.npy')
-        #assert (np.allclose(variable0_val, variable0_check))
         ## Manualy collect variables:
         vals = pickle.load(open('demo-collected-manually.pkl', 'rb'))
         var = tf.trainable_variables()
@@ -251,17 +243,12 @@ def execute(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, 
             assign_op = v.assign(vals[v.name])
             sess.run(assign_op)
 
-
-
-
         #agent.initialize(sess)
         agent.sess = sess
-        import IPython
-        IPython.embed()
-
+        #import IPython
+        #IPython.embed()
 
         #sess.graph.finalize()
-
 
         experts = []
 
