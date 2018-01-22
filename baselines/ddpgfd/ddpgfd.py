@@ -362,7 +362,7 @@ class DDPGFD(object):
 
     def train(self, num_iter):
         # Get a batch.
-        print('                     num training iter ', num_iter)
+        #print('                     num training iter ', num_iter)
         #import IPython:
         #IPython.embed()
         if num_iter == 0 or self.priorization_off:

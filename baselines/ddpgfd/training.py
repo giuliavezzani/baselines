@@ -48,7 +48,7 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
 
         if not behaviour_cloning_off:
             for t_train_bc in range(nb_training_bc):
-                print('---- bc step -----', t_train_bc)
+                #print('---- bc step -----', t_train_bc)
                 agent.behaviour_cloning()
 
         agent.reset()
@@ -83,7 +83,7 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                 for t_rollout in range(nb_rollout_steps):
                     # Predict next action.
 
-                    print('num rollout collected: ', t_rollout)
+                    #print('num rollout collected: ', t_rollout)
 
                     if done:
                         obs = env.reset()
