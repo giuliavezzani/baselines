@@ -237,7 +237,7 @@ def execute(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, 
         agent.initialize(sess)
 
         ## Manualy collect variables:
-        vals = pickle.load(open('demo-collected-manually.pkl', 'rb'))
+        vals = pickle.load(open(model_name, 'rb'))
         var = tf.trainable_variables()
         for v in var:
             assign_op = v.assign(vals[v.name])
