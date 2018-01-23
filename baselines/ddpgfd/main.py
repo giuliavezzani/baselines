@@ -72,7 +72,7 @@ def run(env_id, seed, noise_type, layer_norm, evaluation, demo_file,  alpha, eps
     demonstrations = read_demo_file(demo_file, n_value, gamma)
     nb_min_demo = len(demonstrations.obs0)
 
-    memory = Memory(limit=int(1e6), action_shape=env.action_space.shape, observation_shape=env.observation_space.shape, nb_min_demo=nb_min_demo, demonstrations=demonstrations)
+    memory = Memory(limit=int(1e6), action_shape=env.action_space.shape, observation_shape=env.observation_space.shape, nb_min_demo=nb_min_demo, demonstrations=demonstrations, eps_d=eps_d)
     critic = Critic(layer_norm=layer_norm)
     actor = Actor(nb_actions, layer_norm=layer_norm)
 
@@ -108,9 +108,6 @@ def read_demo_file(demo_file, n_value, gamma):
     terms = list()
     rewardsn = list()
     termsn = list()
-
-    print(demo_dict[0]['s0'].shape)
-    print(demo_dict[0]['r'].shape)
 
     for i in range(0,len(demo_dict) - 1):
         obs0.append( demo_dict[i]['s0'] )
@@ -185,15 +182,15 @@ def parse_args():
     parser.add_argument('--num-timesteps', type=int, default=None)
     parser.add_argument('--demo-file', type=str, default='demo-collected-2.npy') # minimum number of demo guaranteed in the replay buffer
     parser.add_argument('--alpha', type=float, default=0.3) # alpha value for priorization
-    parser.add_argument('--eps', type=float, default=0.3) # constant for priorization computation
-    parser.add_argument('--eps_d', type=float, default=0.3) # constant for priorization computation
-    parser.add_argument('--lambda-3', type=float, default=0.3) # weight for priorization computation
+    parser.add_argument('--eps', type=float, default=0.005) # constant for priorization computation
+    parser.add_argument('--eps_d', type=float, default=0.01) # constant for priorization computation
+    parser.add_argument('--lambda-3', type=float, default=1.0) # weight for priorization computation
     parser.add_argument('--target-period-update', type=int, default=20) # target networks are updated every target_period_update training steps
     parser.add_argument('--nb-training-bc', type=int, default=20) # number of behaviour_cloning training step to be performed
     parser.add_argument('--t-inner-steps', type=int, default=20)
-    parser.add_argument('--n-value', type=int, default=20)
+    parser.add_argument('--n-value', type=int, default=5)
     boolean_flag(parser, 'evaluation', default=False)
-    parser.add_argument('--lambda-n', type=float, default=0.3) # weight for priorization computation
+    parser.add_argument('--lambda-n', type=float, default=0.1) # weight for priorization computation
     boolean_flag(parser, 'behaviour-cloning-off', default=False)
     boolean_flag(parser, 'priorization-off', default=False)
     boolean_flag(parser, 'nstep-loss-off', default=False)

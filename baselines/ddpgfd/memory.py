@@ -44,11 +44,12 @@ def array_min2d(x):
     return x.reshape(-1, 1)
 
 class Memory(object):
-    def __init__(self, limit, action_shape, observation_shape, nb_min_demo, demonstrations):
+    def __init__(self, limit, action_shape, observation_shape, nb_min_demo, demonstrations, eps_d):
         self.limit = limit
         # Minimum number of demonstration to be included in the buffer
         assert( nb_min_demo > 0 )
         self.nb_min_demo = nb_min_demo
+        self.eps_d = eps_d
 
 
         self.observations0 = DemoRingBuffer(limit,demonstrations.obs0, nb_min_demo, shape=observation_shape)
@@ -93,6 +94,10 @@ class Memory(object):
         # Draw such that we always have a proceeding element.
 
         #print(priority)
+        
+        for i in range(self.nb_min_demo):
+            priority[i,0] += self.eps_d
+
         priority[:,0] = priority[:,0]/  np.sum(priority[:,0])
         #priority= priority/  np.sum(priority)
         #print('in memory', np.sum(priority[:,0]))
