@@ -72,14 +72,15 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
         epoch_actions = []
         epoch_qs = []
         epoch_episodes = 0
-        rollout_acts = []
-        rollout_obs0 = []
-        rollout_obs1 = []
-        rollout_rews = []
-        rollout_terms1 = []
+
         for epoch in range(nb_epochs):
             for cycle in range(nb_epoch_cycles):
                 # Collect more rollouts
+                rollout_acts = []
+                rollout_obs0 = []
+                rollout_obs1 = []
+                rollout_rews = []
+                rollout_terms1 = []
                 for t_rollout in range(nb_rollout_steps):
                     # Predict next action.
                     print('num roll', t_rollout)
@@ -104,7 +105,7 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
 
                         new_obs, r, done, info = env.step(max_action * action)  # scale for execution in env (as far as DDPGfD is concerned, every action is in [-1, 1])
                         t += 1
-            
+
                         if rank == 0 and render and epoch/nb_epochs >= 0.8:
                             env.render()
                         episode_reward += r
@@ -122,6 +123,7 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
 
                     print('time for collecting rollout', time.time() - start_time)
 
+                    start_time = time.time()
                     epoch_episode_rewards.append(episode_reward)
                     episode_rewards_history.append(episode_reward)
                     epoch_episode_steps.append(episode_step)
@@ -135,6 +137,8 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                 epoch_actor_losses = []
                 epoch_critic_losses = []
                 epoch_adaptive_distances = []
+
+                print('time for storing transitions', time.time() - start_time)
 
                 for t_train in range(nb_train_steps):
                     print('num train',t_train)

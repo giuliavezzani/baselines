@@ -358,6 +358,8 @@ class DDPGFD(object):
         #import IPython
         #IPython.embed()
 
+        print('____________________observations len in store______________________________ ', len(obs0))
+
         for i in range(len(obs0)):
             self.memory.append(obs0[i], obs1[i], obsn_single[i], action[i], reward[i],  terminal1[i], termn_single[i], rewn_single[i])
 
