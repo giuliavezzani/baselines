@@ -371,7 +371,9 @@ class DDPGFD(object):
         #IPython.embed()
         if num_iter == 0 or self.priorization_off:
             # First time sample uniformly
+            start_time = time.time()
             batch = self.memory.sample(batch_size=self.batch_size)
+            print(' Time for sampling without prior ', time.time() - start_time)
             #priority = np.ones(shape=(self.memory.observations0.length, ))
         elif not self.priorization_off:
             # Then, sample with priorization
@@ -379,7 +381,7 @@ class DDPGFD(object):
            batch = self.memory.sample_with_priorization(batch_size=self.batch_size, priority=self.priority)
            #print(' Time for sampling with prior ', time.time() - start_time)
 
-        #start_time = time.time()
+        start_time = time.time()
         if self.normalize_returns and self.enable_popart:
             old_mean, old_std, target_Q,target_Q_n = self.sess.run([self.ret_rms.mean, self.ret_rms.std, self.target_Q, self.target_Q_n], feed_dict={
                 self.obs1: batch['obs1'],
@@ -395,7 +397,7 @@ class DDPGFD(object):
                 self.old_std : np.array([old_std]),
                 self.old_mean : np.array([old_mean]),
             })
-            #print(' Time for normalized Q', time.time() - start_time)
+            print(' Time for normalized Q', time.time() - start_time)
 
             # Run sanity check. Disabled by default since it slows down things considerably.
             # print('running sanity check')
@@ -419,7 +421,7 @@ class DDPGFD(object):
 
         # Multiple learning steps
         for t_learn in np.arange(self.t_inner_steps):
-            #start_time = time.time()
+            start_time = time.time()
             # Get all gradients and perform a synced update.
             if num_iter == 0 or self.priorization_off:
                 ops = [self.actor_grads, self.actor_loss, self.critic_grads, self.critic_loss]
@@ -446,9 +448,9 @@ class DDPGFD(object):
                 self.actor_optimizer.update(actor_grads, stepsize=self.actor_lr)
                 self.critic_optimizer.update(critic_grads, stepsize=self.critic_lr)
 
-            #print(' Time optimizers updates', time.time() - start_time)
+            print(' Time optimizers updates', time.time() - start_time)
 
-            #start_time = time.time()
+            start_time = time.time()
             #if not self.priorization_off:
             #    self.priority = self.sess.run(self.prior, feed_dict={
             #        self.actions: self.memory.actions.get_batch(np.arange(len(self.memory.actions))),
@@ -469,7 +471,7 @@ class DDPGFD(object):
                 for idx, priority in zip(self.memory.batch_idxs, self.priority_minibatch):
                     self.priority[idx] = priority
 
-            #print(' Priority computation', time.time() - start_time)
+            print(' Priority computation', time.time() - start_time)
 
             #print('buffer dim', len(self.memory.actions))
 

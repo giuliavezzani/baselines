@@ -83,6 +83,7 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                 for t_rollout in range(nb_rollout_steps):
                     # Predict next action.
                     print('num roll', t_rollout)
+                    start_time = time.time()
 
                     #print('num rollout collected: ', t_rollout)
 
@@ -103,6 +104,7 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
 
                         new_obs, r, done, info = env.step(max_action * action)  # scale for execution in env (as far as DDPGfD is concerned, every action is in [-1, 1])
                         t += 1
+            
                         if rank == 0 and render and epoch/nb_epochs >= 0.8:
                             env.render()
                         episode_reward += r
@@ -117,6 +119,8 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                         rollout_rews.append(r)
 
                         obs = new_obs
+
+                    print('time for collecting rollout', time.time() - start_time)
 
                     epoch_episode_rewards.append(episode_reward)
                     episode_rewards_history.append(episode_reward)
