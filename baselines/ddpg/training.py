@@ -213,6 +213,15 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                     with open(os.path.join(logdir, 'eval_env_state.pkl'), 'wb') as f:
                         pickle.dump(eval_env.get_state(), f)
 
+        current_time = time.localtime()
+
+        var = tf.trainable_variables()
+        var_value = {}
+        for v in var:
+            var_value[v.name] = sess.run(v)
+        pickle.dump(var_value, open(saving_folder +'trained-variables-DDPG-'+env_id+'-'+time.strftime('%Y-%m-%d-%H-%M-%S', current_time)+'.pkl', 'wb'))
+
+
         # Run the trained policy for collecting the demonstrations
         current_time = time.localtime()
         experts = []
