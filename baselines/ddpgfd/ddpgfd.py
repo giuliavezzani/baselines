@@ -460,7 +460,7 @@ class DDPGFD(object):
             #        self.terminals1: self.memory.terminals1.get_batch(np.arange(len(self.memory.terminals1))).reshape(len(self.memory.terminals1),1).astype('float32')
             #    })
             if not self.priorization_off:
-                self.priority_minibatch = self.sess.run([self.prior], feed_dict={
+                self.priority_minibatch = self.sess.run(self.prior, feed_dict={
                     self.actions: batch['actions'],
                     self.obs0: batch['obs0'],
                     self.obs1: batch['obs1'],

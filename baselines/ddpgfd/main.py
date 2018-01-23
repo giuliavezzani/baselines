@@ -186,7 +186,7 @@ def parse_args():
     parser.add_argument('--eps_d', type=float, default=0.01) # constant for priorization computation
     parser.add_argument('--lambda-3', type=float, default=1.0) # weight for priorization computation
     parser.add_argument('--target-period-update', type=int, default=20) # target networks are updated every target_period_update training steps
-    parser.add_argument('--nb-training-bc', type=int, default=20) # number of behaviour_cloning training step to be performed
+    parser.add_argument('--nb-training-bc', type=int, default=200) # number of behaviour_cloning training step to be performed
     parser.add_argument('--t-inner-steps', type=int, default=20)
     parser.add_argument('--n-value', type=int, default=5)
     boolean_flag(parser, 'evaluation', default=False)
