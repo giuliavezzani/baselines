@@ -92,10 +92,10 @@ class Memory(object):
     def sample_with_priorization(self, batch_size, priority):
         # Draw such that we always have a proceeding element.
 
-        print(priority)
+        #print(priority)
         priority[:,0] = priority[:,0]/  np.sum(priority[:,0])
         #priority= priority/  np.sum(priority)
-        print('in memory', np.sum(priority[:,0]))
+        #print('in memory', np.sum(priority[:,0]))
 
         self.batch_idxs = np.random.choice(self.nb_entries, size=batch_size, p=priority[:,0])
         #self.batch_idxs = np.random.choice(self.nb_entries, size=batch_size, p=priority)
