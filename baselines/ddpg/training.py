@@ -15,7 +15,7 @@ from mpi4py import MPI
 
 def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, param_noise, actor, critic,
     normalize_returns, normalize_observations, critic_l2_reg, actor_lr, critic_lr, action_noise,
-    popart, gamma, clip_norm, nb_train_steps, nb_rollout_steps, nb_eval_steps, batch_size, memory, env_id,model_name,
+    popart, gamma, clip_norm, nb_train_steps, nb_rollout_steps, nb_eval_steps, batch_size, memory, env_id,model_name,saving_folder,
     tau=0.01, eval_env=None, param_noise_adaption_interval=50):
     rank = MPI.COMM_WORLD.Get_rank()
 
@@ -159,9 +159,9 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                 #print(variable0.name)
                 #np.save('test.npy', variable0_val)
 
-            if epoch == 200 :
-                import IPython
-                IPython.embed()
+            #if epoch == 200 :
+            #    import IPython
+            #    IPython.embed()
 
 
             # Log stats.
@@ -212,6 +212,53 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                 if eval_env and hasattr(eval_env, 'get_state'):
                     with open(os.path.join(logdir, 'eval_env_state.pkl'), 'wb') as f:
                         pickle.dump(eval_env.get_state(), f)
+
+        # Run the trained policy for collecting the demonstrations
+        current_time = time.localtime()
+        experts = []
+        done = False
+
+        for i_rollout in range(nb_rollout_steps):
+            print('rollout_no: ', i_rollout)
+
+            rewards = []
+            observations0 = []
+            actions = []
+            observations1 = []
+            terminals = []
+
+            if (i_rollout > 0):
+                obs = env.reset()
+
+                done = False
+
+            episode_rew = 0
+
+            while not done:
+                env.render()
+                #action = act(obs[None, :])
+                observations0.append(obs)
+                action, q = agent.pi(obs, apply_noise=False)
+
+                assert max_action.shape == action.shape
+                new_obs, r, done, info = env.step(max_action * action)
+                actions.append(action)
+                observations1.append(obs)
+                terminals.append(done)
+                rewards.append(r)
+
+                obs = new_obs
+
+            print('reward', np.sum(np.asarray(rewards)))
+
+            expert_data = {'s0': np.array(observations0),
+                           's1': np.array(observations1),
+                           'a': np.array(actions),
+                           'r': np.array(rewards),
+                           't': np.array(terminals)}
+            experts.append(expert_data)
+
+        np.save(saving_folder + 'demo-collected-'+env_id+'-'+time.strftime('%Y-%m-%d-%H-%M-%S', current_time)+'.npy', experts)
 
 
 def execute(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, param_noise, actor, critic,
