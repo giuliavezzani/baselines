@@ -12,9 +12,12 @@ from baselines.ddpg.models import Actor, Critic
 from baselines.ddpg.memory import Memory
 from baselines.ddpg.noise import *
 
+import solveHMS.envs.mujoco150
+
 import gym
 import tensorflow as tf
 from mpi4py import MPI
+
 
 def run(env_id, seed, noise_type, layer_norm, evaluation, execution,model_name, saving_folder, **kwargs):
     # Configure things.
