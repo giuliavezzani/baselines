@@ -53,7 +53,7 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
         agent.initialize(sess)
         #agent.sess = sess
 
-        #aver = tf.train.Saver()
+        saver = tf.train.Saver()
         #saver.restore(sess, model_name)
         sess.graph.finalize()
 
@@ -104,7 +104,7 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                     obs = new_obs
 
                     if done:
-                        print('return ', episode_reward)
+
                         # Episode done.
                         epoch_episode_rewards.append(episode_reward)
                         episode_rewards_history.append(episode_reward)
