@@ -151,9 +151,9 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                             eval_episode_rewards_history.append(eval_episode_reward)
                             eval_episode_reward = 0.
 
-            if np.mod(epoch, 2) == 0:
-                save_path = saver.save(sess, '/tmp/models/ddpg'+'-env-' + str(env_id) +'.ckpt', global_step=epoch)
-                print('Model saved in ', save_path)
+            #if np.mod(epoch, 2) == 0:
+                #save_path = saver.save(sess, '/tmp/models/ddpg'+'-env-' + str(env_id) +'.ckpt', global_step=epoch)
+                #print('Model saved in ', save_path)
                 #variable0 = tf.trainable_variables()[0]
                 #variable0_val = sess.run(variable0)
                 #print(variable0.name)
