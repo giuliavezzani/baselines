@@ -14,7 +14,7 @@ from mpi4py import MPI
 
 
 def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, param_noise, actor, critic,
-    normalize_returns, normalize_observations, critic_l2_reg, actor_lr, critic_lr, action_noise,
+    normalize_returns, normalize_observations, critic_l2_reg, actor_lr, critic_lr, action_noise, saving_folder,
     popart, gamma, clip_norm, nb_train_steps, nb_rollout_steps, nb_eval_steps, batch_size, batch_size_bc,priorization_off, nstep_loss_off,
     memory, eps, eps_d, lambda_3, lambda_n, alpha,  target_period_update, nb_training_bc,t_inner_steps,n_value, behaviour_cloning_off,
     tau=0.01, eval_env=None, param_noise_adaption_interval=50):
@@ -168,6 +168,15 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                             eval_episode_rewards.append(eval_episode_reward)
                             eval_episode_rewards_history.append(eval_episode_reward)
                             eval_episode_reward = 0.
+
+            current_time = time.localtime()
+
+            if np.mod(epoch, 10) == 0:
+                var = tf.trainable_variables()
+                var_value = {}
+                for v in var:
+                    var_value[v.name] = sess.run(v)
+                pickle.dump(var_value, open(saving_folder +'/trained-variables-DDPGfD-''-'+time.strftime('%Y-%m-%d-%H-%M-%S', current_time)+'-'+str(epoch)+'.pkl', 'wb'))
 
             # Log stats.
             epoch_train_duration = time.time() - epoch_start_time

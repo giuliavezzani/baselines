@@ -159,6 +159,15 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                 #print(variable0.name)
                 #np.save('test.npy', variable0_val)
 
+            current_time = time.localtime()
+
+            if np.mod(epoch, 10) == 0:
+                var = tf.trainable_variables()
+                var_value = {}
+                for v in var:
+                    var_value[v.name] = sess.run(v)
+                pickle.dump(var_value, open(saving_folder +'/trained-variables-DDPG-'+env_id+'-'+time.strftime('%Y-%m-%d-%H-%M-%S', current_time)+'-'+str(epoch)+'.pkl', 'wb'))
+
             #if epoch == 200 :
             #    import IPython
             #    IPython.embed()
@@ -213,13 +222,7 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                     with open(os.path.join(logdir, 'eval_env_state.pkl'), 'wb') as f:
                         pickle.dump(eval_env.get_state(), f)
 
-        current_time = time.localtime()
 
-        var = tf.trainable_variables()
-        var_value = {}
-        for v in var:
-            var_value[v.name] = sess.run(v)
-        pickle.dump(var_value, open(saving_folder +'trained-variables-DDPG-'+env_id+'-'+time.strftime('%Y-%m-%d-%H-%M-%S', current_time)+'.pkl', 'wb'))
 
 
         # Run the trained policy for collecting the demonstrations
