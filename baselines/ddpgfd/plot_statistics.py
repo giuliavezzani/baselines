@@ -14,15 +14,17 @@ def plot(file_path, **kwargs):
     count = 1
     color=cm.rainbow(np.linspace(0,1,26))
 
+    print(len(data))
     for key in sorted(data.keys()):
-        x = np.arange(0,len(data[key]))
-        y = data[key]
-        c = color[count - 1]
-        plt.subplot(5,6, count)
-        plt.xlabel('Epochs ', fontsize=8)
-        plt.ylabel(key, fontsize=8)
-        plt.plot(x,y, linewidth=2, c=c)
-        count += 1
+        #if count < 11:
+            x = np.arange(0,len(data[key]))
+            y = data[key]
+            c = color[(count - 1)%26]
+            plt.subplot(5,6, count)
+            plt.xlabel('Epochs ', fontsize=8)
+            plt.ylabel(key, fontsize=8)
+            plt.plot(x,y, linewidth=2, c=c)
+            count += 1
 
     plt.show()
 
