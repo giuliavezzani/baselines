@@ -14,10 +14,10 @@ from baselines.common.misc_util import (
     set_global_seeds,
     boolean_flag,
 )
-import baselines.ddpg.training as training
-from baselines.ddpg.models import Actor, Critic
-from baselines.ddpg.memory import Memory
-from baselines.ddpg.noise import *
+import baselines.ddpgfd.training as training
+from baselines.ddpgfd.models import Actor, Critic
+from baselines.ddpgfd.memory import Memory
+from baselines.ddpgfd.noise import *
 
 
 
@@ -26,22 +26,22 @@ import solveHMS.envs
 import tensorflow as tf
 import pickle
 
-from baselines.ddpg.ddpg import DDPG
-from baselines.ddpg.util import mpi_mean, mpi_std, mpi_max, mpi_sum
+from baselines.ddpgfd.ddpgfd import DDPGFD
+from baselines.ddpgfd.util import mpi_mean, mpi_std, mpi_max, mpi_sum
 import baselines.common.tf_util as U
 
 from baselines import logger
 import numpy as np
 import glob
 
-def success_perc(env_id, seed, noise_type, layer_norm, evaluation, execution,model_name, saving_folder, **kwargs):
+def success_perc(env_id, seed, noise_type, layer_norm, evaluation, execution,model_name, saving_folder,nb_min_demo,  **kwargs):
 
     e = gym.make(env_id)
     nb_actions = e.action_space.shape[-1]
     max_action = e.action_space.high
-
+    demonstrations = []
     # Configure components.
-    memory = Memory(limit=int(1e6), action_shape=e.action_space.shape, observation_shape=e.observation_space.shape)
+    memory = Memory(limit=int(1e6), action_shape=e.action_space.shape, observation_shape=e.observation_space.shape, nb_min_demo=nb_min_demo, demonstrations=demonstrations, eps_d=0.0)
     critic = Critic(layer_norm=layer_norm)
     actor = Actor(nb_actions, layer_norm=layer_norm)
 
@@ -51,7 +51,7 @@ def success_perc(env_id, seed, noise_type, layer_norm, evaluation, execution,mod
     #e.seed(seed)
 
 
-    agent = DDPG(actor, critic, memory, e.observation_space.shape, e.action_space.shape)
+    agent = DDPGFD(actor, critic, memory, e.observation_space.shape, e.action_space.shape)
         #gamma=gamma, tau=tau, normalize_returns=normalize_returns, normalize_observations=normalize_observations,
         ##batch_size=batch_size, action_noise=action_noise, param_noise=param_noise, critic_l2_reg=critic_l2_reg,
         #actor_lr=actor_lr, critic_lr=critic_lr, enable_popart=popart, clip_norm=clip_norm,
@@ -115,7 +115,7 @@ def success_perc(env_id, seed, noise_type, layer_norm, evaluation, execution,mod
 
                     rewards.append(r)
 
-                    agent.store_transition(obs, actions, rewards, observations1, terminals, execute=True)
+                    #agent.store_transition(obs, actions, rewards, observations1, terminals, execute=True)
 
                 print('reward', np.sum(np.asarray(rewards)))
 
@@ -158,23 +158,38 @@ def parse_args():
     parser.add_argument('--seed', help='RNG seed', type=int, default=0)
     parser.add_argument('--critic-l2-reg', type=float, default=1e-2)
     parser.add_argument('--batch-size', type=int, default=64)  # per MPI worker
+    parser.add_argument('--batch-size-bc', type=int, default=64)
     parser.add_argument('--actor-lr', type=float, default=1e-4)
     parser.add_argument('--critic-lr', type=float, default=1e-3)
     boolean_flag(parser, 'popart', default=False)
     parser.add_argument('--gamma', type=float, default=0.99)
-    parser.add_argument('--reward-scale', type=float, default=1.5)
+    parser.add_argument('--reward-scale', type=float, default=1.)
     parser.add_argument('--clip-norm', type=float, default=None)
     parser.add_argument('--nb-epochs', type=int, default=500)  # with default settings, perform 1M steps total
     parser.add_argument('--nb-epoch-cycles', type=int, default=20)
     parser.add_argument('--nb-train-steps', type=int, default=50)  # per epoch cycle and MPI worker
     parser.add_argument('--nb-eval-steps', type=int, default=100)  # per epoch cycle and MPI worker
-    parser.add_argument('--nb-rollout-steps', type=int, default=100)  # per epoch cycle and MPI worker
+    parser.add_argument('--nb-rollout-steps', type=int, default=3)  # per epoch cycle and MPI worker
     parser.add_argument('--noise-type', type=str, default='adaptive-param_0.2')  # choices are adaptive-param_xx, ou_xx, normal_xx, none
     parser.add_argument('--num-timesteps', type=int, default=None)
+    parser.add_argument('--demo-file', type=str, default='demo-collected-2.npy') # minimum number of demo guaranteed in the replay buffer
+    parser.add_argument('--alpha', type=float, default=0.3) # alpha value for priorization
+    parser.add_argument('--eps', type=float, default=0.005) # constant for priorization computation
+    parser.add_argument('--eps_d', type=float, default=0.01) # constant for priorization computation
+    parser.add_argument('--lambda-3', type=float, default=1.0) # weight for priorization computation
+    parser.add_argument('--target-period-update', type=int, default=20) # target networks are updated every target_period_update training steps
+    parser.add_argument('--nb-training-bc', type=int, default=10000) # number of behaviour_cloning training step to be performed
+    parser.add_argument('--t-inner-steps', type=int, default=1)
+    parser.add_argument('--n-value', type=int, default=5)
     boolean_flag(parser, 'evaluation', default=False)
+    parser.add_argument('--lambda-n', type=float, default=0.1) # weight for priorization computation
+    boolean_flag(parser, 'behaviour-cloning-off', default=False)
+    boolean_flag(parser, 'priorization-off', default=False)
+    boolean_flag(parser, 'nstep-loss-off', default=False)
+    parser.add_argument('--saving-folder', type=str, default='/home/giulia/tmp/prova')
     boolean_flag(parser, 'execution', default=False)
     parser.add_argument('--model-name', type=str, default='/tmp/models/ddpg-env-Hopper-v1.ckpt-0')
-    parser.add_argument('--saving-folder', type=str, default='/tmp/models/ddpg/')
+    parser.add_argument('--nb-min-demo', type=int, default=50)
     args = parser.parse_args()
     # we don't directly specify timesteps for this script, so make sure that if we do specify them
     # they agree with the other parameters
