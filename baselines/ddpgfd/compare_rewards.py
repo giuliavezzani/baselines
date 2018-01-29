@@ -18,9 +18,9 @@ def plot(file_path_ddpg, file_path_ddpgfd,label1, label2, **kwargs):
     for key in sorted(data_ddpg.keys()):
         x_ddpg = np.arange(0,len(data_ddpg[key]))
         y_ddpg = data_ddpg[key]
-        #c = color[(count - 1)%26]
-        if count < 11:
-        plt.subplot(10,10, count)
+        c = color[(count - 1)%26]
+
+        plt.subplot(6,5, count)
         plt.xlabel('Epochs ', fontsize=8)
         plt.ylabel(key, fontsize=8)
         line_ddpg = plt.plot(x_ddpg,y_ddpg, linewidth=2, c=c, label=label1)
