@@ -12,6 +12,9 @@ import numpy as np
 import tensorflow as tf
 from mpi4py import MPI
 
+import gym
+import solveHMS.envs
+
 
 def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, param_noise, actor, critic,
     normalize_returns, normalize_observations, critic_l2_reg, actor_lr, critic_lr, action_noise, saving_folder,
@@ -73,6 +76,7 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
         epoch_qs = []
         epoch_episodes = 0
 
+
         for epoch in range(nb_epochs):
             for cycle in range(nb_epoch_cycles):
                 # Collect more rollouts
@@ -81,6 +85,8 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                 rollout_obs1 = []
                 rollout_rews = []
                 rollout_terms1 = []
+
+
                 for t_rollout in range(nb_rollout_steps):
                     # Predict next action.
                     print('num roll', t_rollout)
@@ -151,25 +157,62 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                         agent.update_target_net()
 
                 # Evaluate.
-                eval_episode_rewards = []
-                eval_qs = []
-                if eval_env is not None:
-                    eval_episode_reward = 0.
-                    for t_rollout in range(nb_eval_steps):
-                        eval_action, eval_q = agent.pi(eval_obs, apply_noise=False, compute_Q=True)
-                        eval_obs, eval_r, eval_done, eval_info = eval_env.step(max_action * eval_action)  # scale for execution in env (as far as DDPGfd is concerned, every action is in [-1, 1])
-                        if render_eval:
-                            eval_env.render()
-                        eval_episode_reward += eval_r
 
-                        eval_qs.append(eval_q)
-                        if eval_done:
-                            eval_obs = eval_env.reset()
-                            eval_episode_rewards.append(eval_episode_reward)
-                            eval_episode_rewards_history.append(eval_episode_reward)
-                            eval_episode_reward = 0.
+                eval_qs = []
+                eval_episode_rewards = []
+                success_percentage = []
+                if eval_env is not None and np.mod(epoch, 10) == 0:
+
+                    experts = []
+                    for t_rollout in range(5):
+
+                        print('roll eval')
+                        eval_rewards = []
+                        eval_actions = []
+                        eval_observations = []
+                        eval_terminals = []
+
+                        eval_done = False
+
+                        eval_episode_reward = 0.
+                        while not eval_done:
+                            eval_action, eval_q = agent.pi(eval_obs, apply_noise=False, compute_Q=True)
+                            eval_obs, eval_r, eval_done, eval_info = eval_env.step(max_action * eval_action)  # scale for execution in env (as far as DDPGfd is concerned, every action is in [-1, 1])
+
+                            eval_episode_reward += eval_r
+
+                            eval_qs.append(eval_q)
+
+                            eval_actions.append(eval_action)
+                            eval_observations.append(eval_obs)
+                            eval_terminals.append(eval_done)
+                            eval_rewards.append(eval_episode_reward)
+
+
+                        eval_obs = eval_env.reset()
+                        eval_episode_rewards.append(eval_episode_reward)
+                        eval_episode_rewards_history.append(eval_episode_reward)
+                        eval_episode_reward = 0.
+                        expert_data = {'observations': np.array(eval_observations),
+                                       'actions': np.array(eval_actions),
+                                       'rewards': np.array(eval_rewards)}
+
+                        experts.append(expert_data)
+
+                    success_percentage.append( eval_env.env.env.evaluate_success(experts))
+
+                    print(success_percentage)
 
             current_time = time.localtime()
+
+            pickle.dump(success_percentage, open(saving_folder + '/success_percentage.npy', 'wb'))
+
+            if np.mod(epoch, 1) == 0:
+                expert_data = {'observations': np.array(observations0),
+                                   'actions': np.array(actions),
+                                   'rewards': np.array(rewards)}
+                experts.append(expert_data)
+
 
             if np.mod(epoch, 10) == 0:
                 var = tf.trainable_variables()
@@ -177,6 +220,7 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
                 for v in var:
                     var_value[v.name] = sess.run(v)
                 pickle.dump(var_value, open(saving_folder +'/trained-variables-DDPGfD-''-'+time.strftime('%Y-%m-%d-%H-%M-%S', current_time)+'-'+str(epoch)+'.pkl', 'wb'))
+
 
             # Log stats.
             epoch_train_duration = time.time() - epoch_start_time
