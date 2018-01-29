@@ -158,60 +158,55 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
 
                 # Evaluate.
 
-                eval_qs = []
-                eval_episode_rewards = []
-                success_percentage = []
-                if eval_env is not None and np.mod(epoch, 10) == 0:
+            eval_qs = []
+            eval_episode_rewards = []
+            success_percentage = []
 
-                    experts = []
-                    for t_rollout in range(5):
+            print('Epoch', epoch)
+            if eval_env is not None and np.mod(epoch, 1) == 0:
 
-                        print('roll eval')
-                        eval_rewards = []
-                        eval_actions = []
-                        eval_observations = []
-                        eval_terminals = []
+                experts = []
+                for t_rollout in range(30):
 
-                        eval_done = False
+                    print('roll eval')
+                    eval_rewards = []
+                    eval_actions = []
+                    eval_observations = []
+                    eval_terminals = []
 
-                        eval_episode_reward = 0.
-                        while not eval_done:
-                            eval_action, eval_q = agent.pi(eval_obs, apply_noise=False, compute_Q=True)
-                            eval_obs, eval_r, eval_done, eval_info = eval_env.step(max_action * eval_action)  # scale for execution in env (as far as DDPGfd is concerned, every action is in [-1, 1])
+                    eval_done = False
 
-                            eval_episode_reward += eval_r
+                    eval_episode_reward = 0.
+                    while not eval_done:
+                        eval_action, eval_q = agent.pi(eval_obs, apply_noise=False, compute_Q=True)
+                        eval_obs, eval_r, eval_done, eval_info = eval_env.step(max_action * eval_action)  # scale for execution in env (as far as DDPGfd is concerned, every action is in [-1, 1])
 
-                            eval_qs.append(eval_q)
+                        eval_episode_reward += eval_r
 
-                            eval_actions.append(eval_action)
-                            eval_observations.append(eval_obs)
-                            eval_terminals.append(eval_done)
-                            eval_rewards.append(eval_episode_reward)
+                        eval_qs.append(eval_q)
+
+                        eval_actions.append(eval_action)
+                        eval_observations.append(eval_obs)
+                        eval_terminals.append(eval_done)
+                        eval_rewards.append(eval_episode_reward)
 
 
-                        eval_obs = eval_env.reset()
-                        eval_episode_rewards.append(eval_episode_reward)
-                        eval_episode_rewards_history.append(eval_episode_reward)
-                        eval_episode_reward = 0.
-                        expert_data = {'observations': np.array(eval_observations),
-                                       'actions': np.array(eval_actions),
-                                       'rewards': np.array(eval_rewards)}
+                    eval_obs = eval_env.reset()
+                    eval_episode_rewards.append(eval_episode_reward)
+                    eval_episode_rewards_history.append(eval_episode_reward)
+                    eval_episode_reward = 0.
+                    expert_data = {'observations': np.array(eval_observations),
+                                   'actions': np.array(eval_actions),
+                                   'rewards': np.array(eval_rewards)}
 
-                        experts.append(expert_data)
+                    experts.append(expert_data)
 
-                    success_percentage.append( eval_env.env.env.evaluate_success(experts))
+                success_percentage.append( eval_env.env.env.evaluate_success(experts))
 
-                    print(success_percentage)
+                print(success_percentage)
+                pickle.dump(success_percentage, open(saving_folder + '/success_percentage.npy', 'wb'))
 
             current_time = time.localtime()
-
-            pickle.dump(success_percentage, open(saving_folder + '/success_percentage.npy', 'wb'))
-
-            if np.mod(epoch, 1) == 0:
-                expert_data = {'observations': np.array(observations0),
-                                   'actions': np.array(actions),
-                                   'rewards': np.array(rewards)}
-                experts.append(expert_data)
 
 
             if np.mod(epoch, 10) == 0:
