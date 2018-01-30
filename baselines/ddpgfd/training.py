@@ -76,7 +76,7 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
         epoch_qs = []
         epoch_episodes = 0
 
-
+        success_percentage = []
         for epoch in range(nb_epochs):
             for cycle in range(nb_epoch_cycles):
                 # Collect more rollouts
@@ -160,15 +160,13 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
 
             eval_qs = []
             eval_episode_rewards = []
-            success_percentage = []
 
-            print('Epoch', epoch)
-            if eval_env is not None and np.mod(epoch, 1) == 0:
+
+            if eval_env is not None and np.mod(epoch, 10) == 0:
 
                 experts = []
                 for t_rollout in range(30):
 
-                    print('roll eval')
                     eval_rewards = []
                     eval_actions = []
                     eval_observations = []
@@ -201,10 +199,10 @@ def train(env, nb_epochs, nb_epoch_cycles, render_eval, reward_scale, render, pa
 
                     experts.append(expert_data)
 
-                success_percentage.append( eval_env.env.env.evaluate_success(experts))
+                success_percentage.append(eval_env.env.env.evaluate_success(experts))
 
                 print(success_percentage)
-                pickle.dump(success_percentage, open(saving_folder + '/success_percentage.npy', 'wb'))
+                pickle.dump(success_percentage, open(saving_folder + '/success_percentage.pkl', 'wb'))
 
             current_time = time.localtime()
 
