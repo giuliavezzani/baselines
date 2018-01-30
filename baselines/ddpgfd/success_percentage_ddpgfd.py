@@ -34,12 +34,94 @@ from baselines import logger
 import numpy as np
 import glob
 
-def success_perc(env_id, seed, noise_type, layer_norm, evaluation, execution,model_name, saving_folder,nb_min_demo,  **kwargs):
+
+class Demo():
+    def __init__(self, obs0, obs1,obsn, acts, rewards, terms, termsn, rewardsn):
+        self.obs0 = obs0
+        self.obs1 = obs1
+        self.obsn = obsn
+        self.acts = acts
+        self.rewards = rewards
+        self.terms = terms
+        self.rewardsn = rewardsn
+        self.termsn = termsn
+
+
+def read_demo_file(demo_file, n_value, gamma):
+
+    demo_dict = pickle.load(open(demo_file, 'rb'))
+    obs0 = list()
+    obs1 = list()
+    obsn = list()
+    acts = list()
+    rewards = list()
+    terms = list()
+    rewardsn = list()
+    termsn = list()
+
+    for i in range(0,len(demo_dict) - 1):
+        obs0.append( demo_dict[i]['observations'] )
+        if (i < len(demo_dict) - 1):
+            obs1.append( demo_dict[i+1]['observations'] )
+        else:
+            obs1.append( demo_dict[i]['observations'] )
+        if i == 0:
+            obs1.append( demo_dict[i]['observations'] )
+
+        acts.append( demo_dict[i]['actions'] )
+        rewards.append( demo_dict[i]['rewards'] )
+
+        term_array = np.zeros(len(demo_dict[i]['rewards']))
+        term_array[len(demo_dict[i]['rewards']) - 1] = 1.0
+        terms.append(term_array)
+
+
+        obsn_single = np.zeros(shape=demo_dict[i]['observations'].shape)
+        termn_single = np.zeros(shape=demo_dict[i]['rewards'].shape)
+        rewn_single = np.zeros(shape=demo_dict[i]['rewards'].shape)
+        for j in range(0,len(demo_dict[i]['observations'])):
+            if (j + n_value <=  len(demo_dict[i]['observations']) - 1):
+                obsn_single[j] = demo_dict[i]['observations'][j + n_value]
+                termn_single[j] = 0.0
+                rewn= 0.
+                for t in range(j, j + n_value):
+                     rewn +=  gamma ** (t - j) * demo_dict[i]['rewards'][t]
+            else:
+                obsn_single[j] = demo_dict[i]['observations'][len(demo_dict[i]['observations']) - 1]
+                termn_single[len(demo_dict[i]['observations']) - 1]= 1.0
+                rewn= 0.
+                termn_single[j]= 1.0
+                for t in range(j, len(demo_dict[i]['observations'])):
+                     rewn +=  gamma ** (t - j) * demo_dict[i]['rewards'][t]
+
+            rewn_single[j] = rewn
+
+
+        termsn.append(termn_single.astype('bool'))
+        obsn.append(obsn_single)
+        rewardsn.append(rewn_single)
+
+
+    #import IPython
+    #IPython.embed()
+    print('obs0', obs0[0].shape)
+    print('obs1', obs1[0].shape)
+    print('obsn', obsn[0].shape)
+    print('acts', acts[0].shape)
+    print('reward', rewards[0].shape)
+    print('terms', terms[0].shape)
+    print('rewardsn', rewardsn[0].shape)
+    print('termsn', termsn[0].shape)
+
+    return Demo(np.vstack(obs0), np.vstack(obs1),np.vstack(obsn), np.vstack(acts), np.concatenate(rewards), np.concatenate(terms), np.concatenate(termsn), np.concatenate(rewardsn))
+
+
+def success_perc(env_id, seed, noise_type, layer_norm, evaluation, execution,model_name, saving_folder,nb_min_demo, demo_file,  **kwargs):
 
     e = gym.make(env_id)
     nb_actions = e.action_space.shape[-1]
     max_action = e.action_space.high
-    demonstrations = []
+    demonstrations = read_demo_file(demo_file, 5, 1.0)
     # Configure components.
     memory = Memory(limit=int(1e6), action_shape=e.action_space.shape, observation_shape=e.observation_space.shape, nb_min_demo=nb_min_demo, demonstrations=demonstrations, eps_d=0.0)
     critic = Critic(layer_norm=layer_norm)
@@ -48,10 +130,12 @@ def success_perc(env_id, seed, noise_type, layer_norm, evaluation, execution,mod
 
     tf.reset_default_graph()
     set_global_seeds(seed)
-    #e.seed(seed)
+    e.seed(0)
 
 
-    agent = DDPGFD(actor, critic, memory, e.observation_space.shape, e.action_space.shape)
+    agent = DDPGFD(actor, critic, memory, e.observation_space.shape, e.action_space.shape,eps=0.0,
+             eps_d=0.0, lambda_3=1.0, batch_size_bc=64, t_inner_steps=1, n_value=5, lambda_n=0.3, alpha=0.3, priorization_off=False, nstep_loss_off=False)
+
         #gamma=gamma, tau=tau, normalize_returns=normalize_returns, normalize_observations=normalize_observations,
         ##batch_size=batch_size, action_noise=action_noise, param_noise=param_noise, critic_l2_reg=critic_l2_reg,
         #actor_lr=actor_lr, critic_lr=critic_lr, enable_popart=popart, clip_norm=clip_norm,
@@ -115,7 +199,7 @@ def success_perc(env_id, seed, noise_type, layer_norm, evaluation, execution,mod
 
                     rewards.append(r)
 
-                    #agent.store_transition(obs, actions, rewards, observations1, terminals, execute=True)
+                    agent.store_transition(obs, actions, rewards, observations1, terminals, execute=True)
 
                 print('reward', np.sum(np.asarray(rewards)))
 
